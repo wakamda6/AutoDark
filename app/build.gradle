@@ -1,0 +1,143 @@
+import java.text.SimpleDateFormat
+
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'org.greenrobot.greendao'
+
+android {
+    compileSdkVersion 33
+
+    defaultConfig {
+        applicationId "com.pengxh.autodingding"
+        minSdkVersion 23
+        targetSdkVersion 33
+        versionCode 1530
+        versionName "1.5.3"
+        flavorDimensions "versionCode"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('autodingding.jks')
+            storePassword '123456789'
+            keyAlias 'key0'
+            keyPassword '123456789'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    def id = "com.${createRandomCode()}.${createRandomCode()}"
+    productFlavors {
+        auto {
+//            applicationId = id
+            applicationId "com.autodark"
+        }
+    }
+    packagingOptions {
+//        resources {applicationId
+            excludes += ['META-INF/NOTICE.md', 'META-INF/LICENSE.md']
+//        }
+    }
+
+
+    compileOptions {
+        targetCompatibility 1.8
+        sourceCompatibility 1.8
+    }
+
+    greendao {
+        schemaVersion 1//数据库版本号
+        targetGenDir 'src/main/java'//设置DaoMaster、DaoSession、Dao目录
+        daoPackage "${defaultConfig.applicationId}.greendao"//设置DaoMaster、DaoSession、Dao包名
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    kotlin {
+        experimental {
+            coroutines 'enable'
+        }
+    }
+
+    viewBinding {
+        enabled true
+    }
+    namespace 'com.pengxh.autodingding'
+
+    applicationVariants.configureEach { variant ->
+        variant.outputs.configureEach {
+            outputFileName = "AUTO_" + getBuildDate() + "_" + defaultConfig.versionName + ".apk"
+        }
+    }
+}
+
+static def createRandomCode() {
+    def alphabetsInLowerCase = "abcdefghijklmnopqrstuvwxyz"
+    def randomString = ''
+    for (int i = 0; i < 10; i++) {
+        def randomIndex = (int) (Math.random() * alphabetsInLowerCase.length())
+        randomString += alphabetsInLowerCase.charAt(randomIndex)
+    }
+    return randomString
+}
+
+static def getBuildDate() {
+    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd", Locale.CHINA)
+    return dateFormat.format(System.currentTimeMillis())
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation 'androidx.core:core-ktx:1.9.0'
+    implementation 'com.github.AndroidCoderPeng:Kotlin-lite-lib:1.0.11'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.6.1'
+    implementation 'androidx.recyclerview:recyclerview:1.3.0'
+    implementation 'com.google.code.gson:gson:2.10.1'
+    //异步响应式
+    implementation 'io.reactivex.rxjava2:rxjava:2.2.19'
+    implementation 'io.reactivex.rxjava2:rxandroid:2.1.1'
+    implementation 'com.squareup.okhttp:okhttp:2.4.0'
+    //上拉加载下拉刷新
+    implementation 'com.scwang.smartrefresh:SmartRefreshLayout:1.1.0'
+    //沉浸式状态栏
+    implementation 'com.gyf.immersionbar:immersionbar:3.0.0'
+    //数据库框架
+    implementation 'org.greenrobot:greendao:3.3.0'
+    //邮件
+    implementation 'com.sun.mail:android-mail:1.6.6'
+    implementation 'com.sun.mail:android-activation:1.6.6'
+    //日期、时间选择器
+    implementation 'com.github.gzu-liyujiang.AndroidPicker:WheelPicker:4.1.13'
+    def vm_version = "2.5.1"
+    //Kotlin协程
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:${vm_version}"
+    implementation 'com.squareup.okhttp3:okhttp:4.9.0'
+    //官方Json解析库
+    implementation 'com.google.code.gson:gson:2.10.1'
+    //异常日志记录
+    implementation 'com.tencent.bugly:crashreport:latest.release'
+    //mqtt库
+    implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5'
+//有问题    implementation 'org.eclipse.paho:org.eclipse.paho.android.service:1.1.1'
+    //new mqtt library that supports android 12
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    implementation 'com.github.hannesa2:paho.mqtt.android:3.3.5'
+
+    implementation 'androidx.work:work-runtime:2.7.1'
+}
+
+project.afterEvaluate{
+    getTasksByName("compileDebugKotlin",false).each {
+        it.mustRunAfter("greendao")
+//        it.dependsOn("greendao")
+    }
+}
