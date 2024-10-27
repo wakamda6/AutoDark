@@ -7,11 +7,6 @@ import com.pengxh.kt.lite.utils.SaveKeyValues
 import com.tencent.bugly.crashreport.CrashReport
 import kotlin.properties.Delegates
 
-/**
- * @author: Pengxh
- * @email: ***REMOVED***
- * @date: 2019/12/25 13:19
- */
 class BaseApplication : Application() {
 
     companion object {

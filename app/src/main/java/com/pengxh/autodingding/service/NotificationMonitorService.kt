@@ -29,15 +29,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
-/**
- * @description: 状态栏监听服务
- * @author: Pengxh
- * @email: ***REMOVED***
- * @date: 2019/12/25 23:17
- */
 class NotificationMonitorService : NotificationListenerService(), LifecycleOwner {
 
-    private val kTag = "MonitorService"
+    private val kTag = "AuToDark.MonitorService"
     private val registry = LifecycleRegistry(this)
 
     override fun getLifecycle(): Lifecycle {
@@ -59,6 +53,8 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
      * 当有新通知到来时会回调
      */
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        Log.d(kTag, "onNotificationPosted: 收到新通知")
+
         val extras = sbn.notification.extras
         // 获取接收消息APP的包名
         val packageName = sbn.packageName
@@ -66,22 +62,29 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
         val title = extras.getString(Notification.EXTRA_TITLE) ?: ""
         // 获取接收消息的内容
         val notice = extras.getString(Notification.EXTRA_TEXT)
+
         if (notice.isNullOrBlank()) {
+            Log.d(kTag, "onNotificationPosted: 通知内容为空，忽略")
             return
         }
-        Log.d(kTag, "onNotificationPosted: $notice")
+
+        Log.d(kTag, "onNotificationPosted: 内容 - $notice")
         SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
 
-        val notificationBean = NotificationBean()
-        notificationBean.uuid = UUID.randomUUID().toString()
-        notificationBean.packageName = packageName
-        notificationBean.notificationTitle = title
-        notificationBean.notificationMsg = notice
-        notificationBean.postTime = System.currentTimeMillis().timestampToCompleteDate()
+        val notificationBean = NotificationBean().apply {
+            uuid = UUID.randomUUID().toString()
+            this.packageName = packageName
+            this.notificationTitle = title
+            this.notificationMsg = notice
+            this.postTime = System.currentTimeMillis().timestampToCompleteDate()
+        }
+
         notificationBeanDao.save(notificationBean)
+        Log.d(kTag, "onNotificationPosted: 保存通知信息至数据库")
 
         val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
         if (emailAddress.isEmpty()) {
+            Log.d(kTag, "onNotificationPosted: 邮箱地址为空")
             "邮箱地址为空".show(this)
             return
         }
@@ -91,7 +94,7 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
                 lifecycleScope.launch(Dispatchers.Main) {
                     backToMainActivity()
                 }
-                //发送打卡成功的邮件
+                // 发送打卡成功的邮件
                 lifecycleScope.launch(Dispatchers.Main) {
                     "即将发送通知邮件，请注意查收".show(this@NotificationMonitorService)
                     withContext(Dispatchers.IO) {
@@ -99,24 +102,25 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
                             Constant.EMAIL_TITLE, "打卡结果通知"
                         ) as String
                         notice.createTextMail(subject, emailAddress).sendTextMail()
+                        Log.d(kTag, "onNotificationPosted: 邮件发送成功")
                     }
                 }
             }
-        } else if (packageName == Constant.WECHAT || packageName == Constant.QQ || packageName == Constant.TIM || packageName == Constant.ZFB) {
+        } else if (packageName in listOf(Constant.WECHAT, Constant.QQ, Constant.TIM, Constant.ZFB)) {
             if (notice.contains("电量")) {
-                val capacity = batteryManager?.getIntProperty(
-                    BatteryManager.BATTERY_PROPERTY_CAPACITY
-                )
-                //发送剩余电量的邮件
+                val capacity = batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                // 发送剩余电量的邮件
                 lifecycleScope.launch(Dispatchers.IO) {
                     "当前手机剩余电量为：${capacity}%".createTextMail(
                         "查询手机电量通知", emailAddress
                     ).sendTextMail()
+                    Log.d(kTag, "onNotificationPosted: 电量邮件发送，剩余电量: $capacity%")
                 }
             } else {
                 val key = SaveKeyValues.getValue(Constant.DING_DING_KEY, "打卡") as String
                 if (notice.contains(key)) {
                     openApplication(Constant.DING_DING)
+                    Log.d(kTag, "onNotificationPosted: 打开钉钉应用")
                 }
             }
         }
@@ -126,25 +130,29 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
         CountDownTimerManager.get.cancelTimer()
 
         if (SaveKeyValues.getValue(Constant.BACK_TO_HOME, false) as Boolean) {
-            //模拟点击Home键
-            val home = Intent(Intent.ACTION_MAIN)
-            home.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            home.addCategory(Intent.CATEGORY_HOME)
+            // 模拟点击Home键
+            val home = Intent(Intent.ACTION_MAIN).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                addCategory(Intent.CATEGORY_HOME)
+            }
             startActivity(home)
-            Log.d(kTag, "onFinish: 模拟点击Home键")
-
+            Log.d(kTag, "backToMainActivity: 模拟点击Home键")
             delay(1000)
         }
 
-        val intent = Intent(this, MainActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
         startActivity(intent)
+        Log.d(kTag, "backToMainActivity: 返回主活动")
     }
 
     /**
      * 当有通知移除时会回调
      */
-    override fun onNotificationRemoved(sbn: StatusBarNotification) {}
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        Log.d(kTag, "onNotificationRemoved: 通知已移除")
+    }
 
     override fun onListenerDisconnected() {
         Log.d(kTag, "onListenerDisconnected: 通知监听服务已关闭")

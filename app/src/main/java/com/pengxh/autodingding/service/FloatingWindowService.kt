@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Message
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.WindowManager
@@ -25,7 +26,7 @@ class FloatingWindowService : Service(), Handler.Callback {
         var weakReferenceHandler: WeakReferenceHandler? = null
     }
 
-    private val kTag = "FloatingWindowService"
+    private val kTag = "AuToDark.FloatingWindowService"
     private val windowManager by lazy { getSystemService<WindowManager>() }
     private val floatView by lazy {
         LayoutInflater.from(this).inflate(R.layout.window_floating, null)
@@ -34,25 +35,29 @@ class FloatingWindowService : Service(), Handler.Callback {
     private lateinit var floatLayoutParams: WindowManager.LayoutParams
 
     override fun onBind(intent: Intent?): IBinder? {
+        Log.d(kTag, "onBind: 服务绑定")
         return null
     }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate() {
         super.onCreate()
+        Log.d(kTag, "onCreate: 创建悬浮窗服务")
         weakReferenceHandler = WeakReferenceHandler(this)
+
         val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                //8.0
+                // Android 8.0及以上
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             } else {
-                //7.1.1
+                // Android 7.1.1及以下
                 WindowManager.LayoutParams.TYPE_PHONE
             }
         } else {
-            //其他版本
+            // 其他版本
             WindowManager.LayoutParams.TYPE_TOAST
         }
+
         floatLayoutParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -63,6 +68,7 @@ class FloatingWindowService : Service(), Handler.Callback {
 
         try {
             windowManager?.addView(floatView, floatLayoutParams)
+            Log.d(kTag, "onCreate: 悬浮窗视图已添加")
 
             var lastX = 0
             var lastY = 0
@@ -76,6 +82,7 @@ class FloatingWindowService : Service(), Handler.Callback {
                         lastY = event.rawY.toInt()
                         paramX = floatLayoutParams.x
                         paramY = floatLayoutParams.y
+                        Log.d(kTag, "onTouch: ACTION_DOWN，记录位置：$lastX, $lastY")
                     }
 
                     MotionEvent.ACTION_MOVE -> {
@@ -85,38 +92,44 @@ class FloatingWindowService : Service(), Handler.Callback {
                         floatLayoutParams.y = paramY + dy
                         // 更新悬浮窗位置
                         windowManager?.updateViewLayout(floatView, floatLayoutParams)
+                        Log.d(kTag, "onTouch: ACTION_MOVE，更新位置：${floatLayoutParams.x}, ${floatLayoutParams.y}")
                     }
                 }
                 false
             }
         } catch (e: IllegalStateException) {
-            e.printStackTrace()
+            Log.e(kTag, "onCreate: IllegalStateException", e)
         } catch (e: WindowManager.BadTokenException) {
-            e.printStackTrace()
+            Log.e(kTag, "onCreate: BadTokenException", e)
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        Log.d(kTag, "onDestroy: 销毁悬浮窗服务")
         windowManager?.removeView(floatView)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val time = SaveKeyValues.getValue(Constant.TIMEOUT, "15s") as String
         textView.text = time
+        Log.d(kTag, "onStartCommand: 设置初始时间为 $time")
         return START_STICKY
     }
 
     override fun handleMessage(msg: Message): Boolean {
+        Log.d(kTag, "handleMessage: 收到消息，what = ${msg.what}")
         when (msg.what) {
             2024071701 -> {
                 val time = msg.obj as Long
                 textView.text = "${time}s"
+                Log.d(kTag, "handleMessage: 更新显示时间为 ${time}s")
             }
 
             2024071702 -> {
                 val time = msg.obj as String
                 textView.text = time
+                Log.d(kTag, "handleMessage: 更新显示时间为 $time")
             }
         }
         return true
