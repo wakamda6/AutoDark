@@ -70,8 +70,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             return
         }
 
-        loadProperties()
-
         dingDingFragment = DingDingFragment()
         settingsFragment = SettingsFragment()
         val fragmentPages = ArrayList<Fragment>()
@@ -82,9 +80,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         val fragmentAdapter = BaseFragmentAdapter(supportFragmentManager, fragmentPages)
         binding.viewPager.adapter = fragmentAdapter
         binding.viewPager.offscreenPageLimit = fragmentPages.size
-
-        // 网络变化接收器初始化
-        networkChangeReceiver = NetworkChangeReceiver(this)
 
         val isFirst = SaveKeyValues.getValue("isFirst", true) as Boolean
         if (isFirst) {
@@ -100,6 +95,14 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     }
                 }).build().show()
         }
+
+        //mqtt set
+        loadProperties()
+        // 网络变化接收器初始化
+        Log.d("networkChangeReceiver","init networkChangeReceiver")
+        networkChangeReceiver = NetworkChangeReceiver(this)
+        //mqtt connect
+//        connectToMqtt()
     }
 
     override fun initEvent() {
@@ -198,7 +201,13 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         unregisterReceiver(networkChangeReceiver)
     }
 
+    var isConnecting = false
     fun connectToMqtt() {
+        if (isMqttConnected() || isConnecting) {
+            Log.d("MQTT", "Already connected or in the process of connecting.")
+            return
+        }
+        isConnecting = true
         Log.d("MQTT", "Starting MQTT connection")
         // 确保网络连接
         if (!NetworkUtils.isNetworkAvailable(this)) {
@@ -220,7 +229,8 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             mqttClient.connect(options, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
                     Log.d("MQTT", "MQTT connection successful")
-                    "MQTT连接成功".show(this@MainActivity)
+//                    "MQTT连接成功".show(this@MainActivity)
+                    isConnecting = false
 
                     val topicsToSubscribe = arrayOf(mqttTopic1, mqttTopic2)
                     val qosLevels = intArrayOf(0, 1) // 对应的QoS级别
@@ -230,22 +240,22 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
                     Log.e("MQTT", "MQTT connection failed: ${exception?.message}")
-                    "MQTT连接失败: ${exception?.message}".show(this@MainActivity)
+//                    "MQTT连接失败: ${exception?.message}".show(this@MainActivity)
+                    isConnecting = false
                 }
             })
         } catch (e: MqttException) {
             Log.e("MQTT", "MQTT connection exception: ${e.message}")
             e.printStackTrace()
-            "MQTT连接异常: ${e.message}".show(this@MainActivity)
+//            "MQTT连接异常: ${e.message}".show(this@MainActivity)
         }
 
         mqttClient.setCallback(object : MqttCallback {
             override fun connectionLost(cause: Throwable?) {
                 // 连接丢失的处理
                 Log.e("MQTT", "Connection lost: ${cause?.message}")
-                Toast.makeText(this@MainActivity, "MQTT连接丢失，请检查网络", Toast.LENGTH_SHORT).show()
-                // 可以选择在这里尝试重连
-                reconnectToMqtt()
+//                Toast.makeText(this@MainActivity, "MQTT连接丢失，请检查网络", Toast.LENGTH_SHORT).show()
+                // 重连由网络通知发起
             }
 
             override fun messageArrived(topic: String?, message: MqttMessage?) {
@@ -274,6 +284,15 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             }
         })
     }
+
+    fun isMqttConnected(): Boolean {
+        return try {
+            ::mqttClient.isInitialized && mqttClient.isConnected
+        } catch (e: UninitializedPropertyAccessException) {
+            false
+        }
+    }
+
 
     //mqtt订阅
     private fun subscribeToTopics(topics: Array<String>, qos: IntArray) {
@@ -330,34 +349,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             Log.e("MQTT", "Failed to publish message: ${e.message}")
         }
     }
-
-
-    //mqtt重连
-    private fun reconnectToMqtt() {
-        try {
-            Log.d("MQTT", "Reconnecting to MQTT broker")
-            mqttClient.connect(MqttConnectOptions().apply {
-                isCleanSession = true
-                connectionTimeout = 10
-                keepAliveInterval = 20
-                userName = user
-                password = pwd.toCharArray()
-            }, null, object : IMqttActionListener {
-                override fun onSuccess(asyncActionToken: IMqttToken?) {
-                    Log.d("MQTT", "Reconnected successfully")
-                    // 重新订阅主题
-                    subscribeToTopics(arrayOf(mqttTopic1, mqttTopic2), intArrayOf(0, 1))
-                }
-
-                override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
-                    Log.e("MQTT", "Reconnection failed: ${exception?.message}")
-                }
-            })
-        } catch (e: MqttException) {
-            Log.e("MQTT", "Reconnection exception: ${e.message}")
-        }
-    }
-
 
     override fun onDestroy() {
         super.onDestroy()

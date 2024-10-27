@@ -11,15 +11,20 @@ import com.pengxh.autodingding.utils.NetworkUtils
 class NetworkChangeReceiver(private val activity: MainActivity) : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
+        Log.d("networkChangeReceiver","NetworkChangeReceiver.ononReceive")
         // 检查网络连接状态
         if (NetworkUtils.isNetworkAvailable(context)) {
             Log.d("NetworkChangeReceiver", "Network is available")
-            Toast.makeText(context, "Network is available", Toast.LENGTH_SHORT).show()
-            // 连接 MQTT
-            activity.connectToMqtt()
+
+            // 检查 MQTT 客户端是否已连接
+            if (!activity.isMqttConnected() && !activity.isConnecting) {
+                Log.d("NetworkChangeReceiver", "MQTT is not connected, attempting to connect")
+                activity.connectToMqtt()
+            } else {
+                Log.d("NetworkChangeReceiver", "MQTT is already connected")
+            }
         } else {
             Log.d("NetworkChangeReceiver", "Network is not available")
-            Toast.makeText(context, "Network is not available", Toast.LENGTH_SHORT).show()
         }
     }
 
