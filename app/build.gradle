@@ -35,16 +35,13 @@ android {
     def id = "com.${createRandomCode()}.${createRandomCode()}"
     productFlavors {
         auto {
-            applicationId = id
             //debug
-//            applicationId "com.autodark"
+            applicationId "com.autodark"
+
+//            applicationId = id
         }
     }
     packagingOptions {
-        //debug
-//        resources {applicationId
-//            excludes += ['META-INF/NOTICE.md', 'META-INF/LICENSE.md']
-//        }
         exclude 'META-INF/NOTICE.md'
         exclude 'META-INF/LICENSE.md'
     }
