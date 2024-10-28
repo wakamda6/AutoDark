@@ -43,9 +43,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     private lateinit var mqttClientId: String
     private lateinit var user: String
     private lateinit var pwd: String
-    private lateinit var mqttTopic1: String
-    private lateinit var mqttTopic2: String
-    private lateinit var mqttTopic3: String
 
     private var menuItem: MenuItem? = null
     private var clickTime: Long = 0
@@ -176,6 +173,13 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     }
 
     //mqtt配置文件导入
+    private lateinit var mqttTopicAutoLastWill: String
+    private lateinit var mqttTopicTest: String
+    private lateinit var mqttTopicTestResult: String
+    private lateinit var mqttTopicCheckAppAlive: String
+    private lateinit var mqttTopicCheckAppAliveResult: String
+    private lateinit var mqttTopicDark: String
+    private lateinit var mqttTopicDarkResult: String
     private fun loadProperties() {
         properties = Properties()
         try {
@@ -186,9 +190,13 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                 mqttClientId = properties.getProperty("mqttClientId") ?: ""
                 user = properties.getProperty("user") ?: ""
                 pwd = properties.getProperty("pwd") ?: ""
-                mqttTopic1 = properties.getProperty("mqttTopic1") ?: ""
-                mqttTopic2 = properties.getProperty("mqttTopic2") ?: ""
-                mqttTopic3 = properties.getProperty("mqttTopic3") ?: ""
+                mqttTopicTest = properties.getProperty("mqttTopicTest") ?: ""
+                mqttTopicTestResult = properties.getProperty("mqttTopicTestResult") ?: ""
+                mqttTopicAutoLastWill = properties.getProperty("mqttTopicAutoLastWill") ?: ""
+                mqttTopicCheckAppAlive = properties.getProperty("mqttTopicCheckAppAlive") ?: ""
+                mqttTopicCheckAppAliveResult = properties.getProperty("mqttTopicCheckAppAliveResult") ?: ""
+                mqttTopicDark = properties.getProperty("mqttTopicDark") ?: ""
+                mqttTopicDarkResult = properties.getProperty("mqttTopicDarkResult") ?: ""
             }
         } catch (e: IOException) {
             e.printStackTrace()
@@ -221,6 +229,9 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             keepAliveInterval = 20
             userName = user
             password = pwd.toCharArray()
+
+            // 设置遗嘱消息
+            setWill(mqttTopicAutoLastWill, "darkPhone_offline".toByteArray(), 1, true)
         }
 
         try {
@@ -230,8 +241,8 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     Log.d("AuToDark.connectToMqtt", "MQTT 连接成功")
                     isConnecting = false
 
-                    val topicsToSubscribe = arrayOf(mqttTopic1, mqttTopic2)
-                    val qosLevels = intArrayOf(0, 1) // QoS 级别
+                    val topicsToSubscribe = arrayOf(mqttTopicTest, mqttTopicCheckAppAlive,mqttTopicAutoLastWill,mqttTopicDark,mqttTopicDarkResult)
+                    val qosLevels = intArrayOf(1,1,1,1,1) // QoS 级别
                     Log.d("AuToDark.connectToMqtt", "连接成功，开始订阅主题: ${topicsToSubscribe.joinToString()}")
                     subscribeToTopics(topicsToSubscribe, qosLevels) // 连接成功后订阅主题
                 }
@@ -256,18 +267,27 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     Log.d("AuToDark.connectToMqtt", "收到主题 $topic 的消息: $msg")
 
                     when (topic) {
-                        mqttTopic1 -> {
-                            Log.d("AuToDark.connectToMqtt", "处理主题 $mqttTopic1 的消息，打开相关应用")
+                        mqttTopicDark -> {
+                            Log.d("AuToDark.connectToMqtt", "处理主题 $mqttTopicDark 的消息，打开相关应用")
                             "收到主题 $topic 的消息: $msg，即将进行Dark".show(this@MainActivity)
+                            Thread.sleep(1000);
                             openApplication(Constant.DING_DING)
+                            Thread.sleep(1000);
+                            publishMessage(mqttTopicDarkResult, "darkPhone_success", 1)
                         }
-                        mqttTopic2 -> {
-                            Log.d("AuToDark.connectToMqtt", "处理主题 $mqttTopic2 的消息，发布测试消息")
-                            publishMessage(mqttTopic2, "test2", 1)
+                        mqttTopicTest -> {
+                            Log.d("AuToDark.connectToMqtt", "处理主题 $mqttTopicTest 的消息，发布测试消息")
+                            publishMessage(mqttTopicTestResult, "darkPhone_testCheck", 1)
                         }
-                        mqttTopic3 -> {
-                            Log.d("AuToDark.connectToMqtt", "处理主题 $mqttTopic2 的消息，发布测试消息")
-                            publishMessage(mqttTopic3, "test3", 0)
+                        mqttTopicCheckAppAlive -> {
+                            Log.d("AuToDark.connectToMqtt", "处理主题 $mqttTopicCheckAppAlive 的消息，检查订阅主题的设备是否都正常连接")
+                            publishMessage(mqttTopicCheckAppAliveResult, "darkPhone_alive", 1)
+                        }
+                        mqttTopicDarkResult -> {
+                            Log.d("AuToDark.connectToMqtt", "处理主题 $mqttTopicDarkResult 的消息")
+                        }
+                        else -> {
+
                         }
                     }
                 }
@@ -275,7 +295,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
             override fun deliveryComplete(token: IMqttDeliveryToken?) {
                 Log.d("AuToDark.connectToMqtt", "消息发送完成，消息 ID: ${token?.messageId}")
-                Toast.makeText(this@MainActivity, "消息发送成功，ID: ${token?.messageId}", Toast.LENGTH_SHORT).show()
             }
         })
     }
