@@ -12,7 +12,7 @@ android {
         minSdkVersion 23
         targetSdkVersion 33
         versionCode 1530
-        versionName "1.5.3"
+        versionName "1.5.4"
         flavorDimensions "versionCode"
     }
 
@@ -35,14 +35,18 @@ android {
     def id = "com.${createRandomCode()}.${createRandomCode()}"
     productFlavors {
         auto {
-//            applicationId = id
-            applicationId "com.autodark"
+            applicationId = id
+            //debug
+//            applicationId "com.autodark"
         }
     }
     packagingOptions {
+        //debug
 //        resources {applicationId
-            excludes += ['META-INF/NOTICE.md', 'META-INF/LICENSE.md']
+//            excludes += ['META-INF/NOTICE.md', 'META-INF/LICENSE.md']
 //        }
+        exclude 'META-INF/NOTICE.md'
+        exclude 'META-INF/LICENSE.md'
     }
 
 
