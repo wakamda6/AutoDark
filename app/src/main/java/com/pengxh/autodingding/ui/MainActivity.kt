@@ -1,5 +1,8 @@
 package com.pengxh.autodingding.ui
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.MenuItem
@@ -23,6 +26,7 @@ import android.net.ConnectivityManager
 import android.util.Log
 import android.content.IntentFilter
 import android.widget.Toast
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.pengxh.autodingding.extensions.openApplication
 import com.pengxh.autodingding.utils.NetworkUtils
 import info.mqtt.android.service.Ack
@@ -46,6 +50,9 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
     private var menuItem: MenuItem? = null
     private var clickTime: Long = 0
+
+    //
+    private lateinit var receiver: BroadcastReceiver
 
 
     override fun initViewBinding(): ActivityMainBinding {
@@ -91,6 +98,24 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         val filter = IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION)
         registerReceiver(networkChangeReceiver, filter)
         Log.d("AuToDark.MainActivity", "网络变化接收器已注册")
+
+        // 创建并注册广播接收器
+        receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                // 处理接收到的消息
+                val message = intent?.getStringExtra("message")
+                Log.d("MainActivity", "Received message: $message")
+                if (intent?.action == "com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION") {
+                    Log.d("AuToDark.connectToMqtt", "收到通知：$message")
+                    if (message != null) {
+                        publishMessage(mqttTopicDarkResult, message,1)
+                    }  // 调用 MainActivity 的函数并传递参数
+                }
+            }
+        }
+
+        val mqttFilter = IntentFilter("com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION")
+        LocalBroadcastManager.getInstance(this).registerReceiver(receiver, mqttFilter)
     }
 
     override fun initEvent() {
@@ -173,7 +198,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     }
 
     //mqtt配置文件导入
-    private lateinit var mqttTopicAutoLastWill: String
     private lateinit var mqttTopicTest: String
     private lateinit var mqttTopicTestResult: String
     private lateinit var mqttTopicCheckAppAlive: String
@@ -192,7 +216,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                 pwd = properties.getProperty("pwd") ?: ""
                 mqttTopicTest = properties.getProperty("mqttTopicTest") ?: ""
                 mqttTopicTestResult = properties.getProperty("mqttTopicTestResult") ?: ""
-                mqttTopicAutoLastWill = properties.getProperty("mqttTopicAutoLastWill") ?: ""
                 mqttTopicCheckAppAlive = properties.getProperty("mqttTopicCheckAppAlive") ?: ""
                 mqttTopicCheckAppAliveResult = properties.getProperty("mqttTopicCheckAppAliveResult") ?: ""
                 mqttTopicDark = properties.getProperty("mqttTopicDark") ?: ""
@@ -229,9 +252,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             keepAliveInterval = 20
             userName = user
             password = pwd.toCharArray()
-
-            // 设置遗嘱消息
-            setWill(mqttTopicAutoLastWill, "darkPhone_offline".toByteArray(), 1, true)
         }
 
         try {
@@ -241,8 +261,8 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     Log.d("AuToDark.connectToMqtt", "MQTT 连接成功")
                     isConnecting = false
 
-                    val topicsToSubscribe = arrayOf(mqttTopicTest, mqttTopicCheckAppAlive,mqttTopicAutoLastWill,mqttTopicDark,mqttTopicDarkResult)
-                    val qosLevels = intArrayOf(1,1,1,1,1) // QoS 级别
+                    val topicsToSubscribe = arrayOf(mqttTopicTest, mqttTopicCheckAppAlive,mqttTopicDark,mqttTopicDarkResult)
+                    val qosLevels = intArrayOf(1,1,1,1) // QoS 级别
                     Log.d("AuToDark.connectToMqtt", "连接成功，开始订阅主题: ${topicsToSubscribe.joinToString()}")
                     subscribeToTopics(topicsToSubscribe, qosLevels) // 连接成功后订阅主题
                 }
@@ -273,7 +293,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                             Thread.sleep(1000);
                             openApplication(Constant.DING_DING)
                             Thread.sleep(1000);
-                            publishMessage(mqttTopicDarkResult, "darkPhone_success", 1)
+//                            publishMessage(mqttTopicDarkResult, "darkPhone_success", 1)
                         }
                         mqttTopicTest -> {
                             Log.d("AuToDark.connectToMqtt", "处理主题 $mqttTopicTest 的消息，发布测试消息")
@@ -384,6 +404,8 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             // 注销接收器
             unregisterReceiver(networkChangeReceiver)
             mqttClient.disconnect()
+            // 注销广播接收器
+            LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver)
         } catch (e: MqttException) {
             e.printStackTrace()
         }

@@ -8,11 +8,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.lifecycleScope
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.pengxh.autodingding.extensions.createTextMail
 import com.pengxh.autodingding.extensions.sendTextMail
 import com.pengxh.autodingding.service.FloatingWindowService
 import com.pengxh.autodingding.ui.MainActivity
 import com.pengxh.kt.lite.extensions.show
+import com.pengxh.kt.lite.extensions.timestampToDate
+import com.pengxh.kt.lite.extensions.timestampToTime
 import com.pengxh.kt.lite.utils.SaveKeyValues
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -22,7 +25,7 @@ import kotlinx.coroutines.withContext
 
 class CountDownTimerManager private constructor() : LifecycleOwner {
 
-    private val kTag = "CountDownTimerManager"
+    private val kTag = "AuToDark.CountDownTimerManager"
     private val registry = LifecycleRegistry(this)
 
     override fun getLifecycle(): Lifecycle {
@@ -80,9 +83,19 @@ class CountDownTimerManager private constructor() : LifecycleOwner {
                         ) as String
                         "".createTextMail(subject, emailAddress).sendTextMail()
                     }
+
+                    //通过mqtt发送
+                    sendBroadcast(context, "未监听到打卡成功的通知" + System.currentTimeMillis().timestampToTime())
                 }
             }
         }.start()
+    }
+
+    private fun sendBroadcast(context: Context, message: String) {
+        Log.d(kTag, "发送打卡结果:$message")
+        val intent = Intent("com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION")
+        intent.putExtra("message", message)
+        LocalBroadcastManager.getInstance(context).sendBroadcast(intent) // 发送本地广播
     }
 
     fun cancelTimer() {

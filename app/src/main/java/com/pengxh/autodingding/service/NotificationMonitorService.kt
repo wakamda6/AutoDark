@@ -1,7 +1,10 @@
 package com.pengxh.autodingding.service
 
 import android.app.Notification
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.BatteryManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -10,6 +13,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.lifecycleScope
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.pengxh.autodingding.BaseApplication
 import com.pengxh.autodingding.bean.NotificationBean
 import com.pengxh.autodingding.extensions.createTextMail
@@ -29,10 +33,42 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
-class NotificationMonitorService : NotificationListenerService(), LifecycleOwner {
+    class NotificationMonitorService : NotificationListenerService(), LifecycleOwner {
 
     private val kTag = "AuToDark.MonitorService"
     private val registry = LifecycleRegistry(this)
+
+    private lateinit var receiver: BroadcastReceiver
+    override fun onCreate() {
+        super.onCreate()
+
+        // 创建广播接收器
+        receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                // 处理广播
+                val message = intent?.getStringExtra("message")
+                Log.d("NotificationMonitorService", "Received message: $message")
+            }
+        }
+
+        // 注册本地广播接收器
+        val filter = IntentFilter("com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION")
+        LocalBroadcastManager.getInstance(this).registerReceiver(receiver, filter)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // 注销本地广播接收器
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver)
+    }
+
+    private fun sendMessageToMainActivity(message: String) {
+        val mIntent = Intent("com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION")
+        mIntent.putExtra("message", message)
+        LocalBroadcastManager.getInstance(this).sendBroadcast(mIntent) // 发送本地广播
+    }
+
+
 
     override fun getLifecycle(): Lifecycle {
         return registry
@@ -105,6 +141,11 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
                         Log.d(kTag, "onNotificationPosted: 邮件发送成功")
                     }
                 }
+
+                //通过mqtt发送通知内容
+                val notification = "dark_success:$title: $notice"
+                sendMessageToMainActivity(notification)
+
             }
         } else if (packageName in listOf(Constant.WECHAT, Constant.QQ, Constant.TIM, Constant.ZFB)) {
             if (notice.contains("电量")) {
