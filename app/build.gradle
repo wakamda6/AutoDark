@@ -8,7 +8,7 @@ android {
     compileSdkVersion 33
 
     defaultConfig {
-        applicationId "com.pengxh.autodingding"
+        applicationId "com.autodark"
         minSdkVersion 23
         targetSdkVersion 33
         versionCode 1530
@@ -18,7 +18,7 @@ android {
 
     signingConfigs {
         release {
-            storeFile file('autodingding.jks')
+            storeFile file('autodark.jks')
             storePassword '123456789'
             keyAlias 'key0'
             keyPassword '123456789'
@@ -71,11 +71,11 @@ android {
     viewBinding {
         enabled true
     }
-    namespace 'com.pengxh.autodingding'
+    namespace 'com.autodark'
 
     applicationVariants.configureEach { variant ->
         variant.outputs.configureEach {
-            outputFileName = "AUTO_" + getBuildDate() + "_" + defaultConfig.versionName + ".apk"
+            outputFileName = "Dark" + getBuildDate() + "_" + defaultConfig.versionName + ".apk"
         }
     }
 }

@@ -8,8 +8,8 @@ import org.greenrobot.greendao.database.Database;
 import org.greenrobot.greendao.identityscope.IdentityScopeType;
 import org.greenrobot.greendao.internal.DaoConfig;
 
-import com.pengxh.autodingding.bean.DateTimeBean;
-import com.pengxh.autodingding.bean.NotificationBean;
+import com.autodark.bean.DateTimeBean;
+import com.autodark.bean.NotificationBean;
 
 import com.autodark.greendao.DateTimeBeanDao;
 import com.autodark.greendao.NotificationBeanDao;
