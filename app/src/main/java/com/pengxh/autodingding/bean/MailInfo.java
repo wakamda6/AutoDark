@@ -3,11 +3,7 @@ package com.pengxh.autodingding.bean;
 import java.io.File;
 import java.util.Properties;
 
-/**
- * @author: Pengxh
- * @email: ***REMOVED***
- * @date: 2020/1/16 15:40
- */
+
 public class MailInfo {
     // 发送邮件的服务器的IP和端口
     private String mailServerHost;
@@ -38,6 +34,8 @@ public class MailInfo {
         p.put("mail.smtp.host", this.mailServerHost);
         p.put("mail.smtp.port", this.mailServerPort);
         p.put("mail.smtp.auth", validate ? "true" : "false");
+        p.put("mail.smtp.starttls.enable", "true");
+        p.put("mail.smtp.ssl.protocols", "TLSv1.2");
         return p;
     }
 

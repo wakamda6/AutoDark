@@ -1,19 +1,14 @@
 package com.pengxh.autodingding.utils
 
-/**
- * @author: Pengxh
- * @email: ***REMOVED***
- * @date: 2019/12/29 12:42
- */
 object Constant {
     //发送者邮箱账号
-    const val USER_MAIL_ACCOUNT = "2570806855@qq.com"
+    const val USER_MAIL_ACCOUNT = "***REMOVED***"
 
     //邮箱授权码，不是密码
-    const val PERMISSION_CODE = "uphzdwgxobwrdjbd"
+    const val PERMISSION_CODE = "***REMOVED***"
 
     //发送者邮箱地址
-    const val MAIL_FROM_ADDRESS = "2570806855@qq.com"
+    const val MAIL_FROM_ADDRESS = "***REMOVED***"
 
     const val EMAIL_ADDRESS = "emailAddress"
     const val EMAIL_TITLE = "emailTitle"
