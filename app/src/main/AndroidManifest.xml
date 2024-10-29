@@ -45,6 +45,11 @@
         </service>
 
         <service android:name=".service.FloatingWindowService" />
+
+        <service
+            android:name=".service.MqttService"
+            android:foregroundServiceType="dataSync" />
+
     </application>
 
     <queries>

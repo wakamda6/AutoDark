@@ -118,12 +118,10 @@ class FloatingWindowService : Service(), Handler.Callback {
     }
 
     override fun handleMessage(msg: Message): Boolean {
-        Log.d(kTag, "handleMessage: 收到消息，what = ${msg.what}")
         when (msg.what) {
             2024071701 -> {
                 val time = msg.obj as Long
                 textView.text = "${time}s"
-                Log.d(kTag, "handleMessage: 更新显示时间为 ${time}s")
             }
 
             2024071702 -> {
