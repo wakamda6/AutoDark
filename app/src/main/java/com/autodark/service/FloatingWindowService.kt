@@ -1,5 +1,6 @@
 package com.autodark.service
 
+import com.autodark.utils.LogUtils
 import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Intent
@@ -35,14 +36,14 @@ class FloatingWindowService : Service(), Handler.Callback {
     private lateinit var floatLayoutParams: WindowManager.LayoutParams
 
     override fun onBind(intent: Intent?): IBinder? {
-        Log.d(kTag, "onBind: 服务绑定")
+        LogUtils.log(Log.DEBUG,kTag, "onBind: 服务绑定")
         return null
     }
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate() {
         super.onCreate()
-        Log.d(kTag, "onCreate: 创建悬浮窗服务")
+        LogUtils.log(Log.DEBUG,kTag, "onCreate: 创建悬浮窗服务")
         weakReferenceHandler = WeakReferenceHandler(this)
 
         val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
@@ -68,7 +69,7 @@ class FloatingWindowService : Service(), Handler.Callback {
 
         try {
             windowManager?.addView(floatView, floatLayoutParams)
-            Log.d(kTag, "onCreate: 悬浮窗视图已添加")
+            LogUtils.log(Log.DEBUG,kTag, "onCreate: 悬浮窗视图已添加")
 
             var lastX = 0
             var lastY = 0
@@ -82,7 +83,7 @@ class FloatingWindowService : Service(), Handler.Callback {
                         lastY = event.rawY.toInt()
                         paramX = floatLayoutParams.x
                         paramY = floatLayoutParams.y
-                        Log.d(kTag, "onTouch: ACTION_DOWN，记录位置：$lastX, $lastY")
+                        LogUtils.log(Log.DEBUG,kTag, "onTouch: ACTION_DOWN，记录位置：$lastX, $lastY")
                     }
 
                     MotionEvent.ACTION_MOVE -> {
@@ -92,7 +93,7 @@ class FloatingWindowService : Service(), Handler.Callback {
                         floatLayoutParams.y = paramY + dy
                         // 更新悬浮窗位置
                         windowManager?.updateViewLayout(floatView, floatLayoutParams)
-                        Log.d(kTag, "onTouch: ACTION_MOVE，更新位置：${floatLayoutParams.x}, ${floatLayoutParams.y}")
+                        LogUtils.log(Log.DEBUG,kTag, "onTouch: ACTION_MOVE，更新位置：${floatLayoutParams.x}, ${floatLayoutParams.y}")
                     }
                 }
                 false
@@ -106,14 +107,14 @@ class FloatingWindowService : Service(), Handler.Callback {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(kTag, "onDestroy: 销毁悬浮窗服务")
+        LogUtils.log(Log.DEBUG,kTag, "onDestroy: 销毁悬浮窗服务")
         windowManager?.removeView(floatView)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val time = SaveKeyValues.getValue(Constant.TIMEOUT, "15s") as String
         textView.text = time
-        Log.d(kTag, "onStartCommand: 设置初始时间为 $time")
+        LogUtils.log(Log.DEBUG,kTag, "onStartCommand: 设置初始时间为 $time")
         return START_STICKY
     }
 
@@ -127,7 +128,7 @@ class FloatingWindowService : Service(), Handler.Callback {
             2024071702 -> {
                 val time = msg.obj as String
                 textView.text = time
-                Log.d(kTag, "handleMessage: 更新显示时间为 $time")
+                LogUtils.log(Log.DEBUG,kTag, "handleMessage: 更新显示时间为 $time")
             }
         }
         return true

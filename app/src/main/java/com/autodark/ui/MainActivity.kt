@@ -21,6 +21,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.autodark.service.MqttService
+import com.autodark.utils.LogUtils
 
 class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMqttCallback {
 
@@ -77,16 +78,22 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
 
     private lateinit var receiver: BroadcastReceiver
     override fun initOnCreate(savedInstanceState: Bundle?) {
-        Log.d("AuToDark.MainActivity", "将活动添加到栈中")
+
+        // 初始化 LogUtils
+        LogUtils.initialize(this)
+
+        // 测试日志输出
+        LogUtils.log(Log.INFO, "MainActivity", "应用启动成功")
+        LogUtils.log(Log.DEBUG,"AuToDark.MainActivity", "将活动添加到栈中")
         ActivityStackManager.addActivity(this)
 
         if (!isAppAvailable(Constant.DING_DING)) {
-            Log.d("AuToDark.MainActivity", "DingDing 应用不可用，显示警告对话框")
+            LogUtils.log(Log.DEBUG,"AuToDark.MainActivity", "DingDing 应用不可用，显示警告对话框")
             showAlertDialog()
             return
         }
 
-        Log.d("AuToDark.MainActivity", "正在初始化页面")
+        LogUtils.log(Log.DEBUG,"AuToDark.MainActivity", "正在初始化页面")
         dingDingFragment = DingDingFragment()
         settingsFragment = SettingsFragment()
         val fragmentPages = ArrayList<Fragment>()
@@ -94,7 +101,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
         fragmentPages.add(dingDingFragment)
         fragmentPages.add(settingsFragment)
 
-        Log.d("AuToDark.MainActivity", "正在设置页面适配器")
+        LogUtils.log(Log.DEBUG,"AuToDark.MainActivity", "正在设置页面适配器")
         val fragmentAdapter =
             com.autodark.adapter.BaseFragmentAdapter(supportFragmentManager, fragmentPages)
         binding.viewPager.adapter = fragmentAdapter
@@ -105,9 +112,9 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
             override fun onReceive(context: Context?, intent: Intent?) {
                 // 处理接收到的消息
                 val message = intent?.getStringExtra("message")
-                Log.d("MainActivity", "Received message: $message")
+                LogUtils.log(Log.DEBUG,"MainActivity", "Received message: $message")
                 if (intent?.action == "com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION") {
-                    Log.d("AuToDark.connectToMqtt", "收到通知：$message")
+                    LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "收到通知：$message")
                     if (message != null) {
                         pushMqttMessage("/topic/darkResult", message,1)
                     }
@@ -120,45 +127,45 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
     }
 
     override fun initEvent() {
-        Log.d("AuToDark.MainActivity", "初始化底部导航监听")
+        LogUtils.log(Log.DEBUG,"AuToDark.MainActivity", "初始化底部导航监听")
         binding.bottomNavigation.setOnItemSelectedListener { item ->
             val itemId: Int = item.itemId
-            Log.d("AuToDark.MainActivity", "选中的菜单项ID: $itemId")
+            LogUtils.log(Log.DEBUG,"AuToDark.MainActivity", "选中的菜单项ID: $itemId")
 
             if (itemId == R.id.nav_dingding) {
                 if (isAppAvailable(Constant.DING_DING)) {
-                    Log.d("AuToDark.MainActivity", "DingDing 应用可用，切换到第一个页面")
+                    LogUtils.log(Log.DEBUG,"AuToDark.MainActivity", "DingDing 应用可用，切换到第一个页面")
                     binding.viewPager.currentItem = 0
                 } else {
-                    Log.d("AuToDark.MainActivity", "DingDing 应用不可用，显示警告对话框")
+                    LogUtils.log(Log.DEBUG,"AuToDark.MainActivity", "DingDing 应用不可用，显示警告对话框")
                     showAlertDialog()
                 }
             } else if (itemId == R.id.nav_settings) {
-                Log.d("AuToDark.MainActivity", "切换到设置页面")
+                LogUtils.log(Log.DEBUG,"AuToDark.MainActivity", "切换到设置页面")
                 binding.viewPager.currentItem = 1
             }
             false
         }
 
-        Log.d("AuToDark.MainActivity", "添加页面改变监听")
+        LogUtils.log(Log.DEBUG,"AuToDark.MainActivity", "添加页面改变监听")
         binding.viewPager.addOnPageChangeListener(object : ViewPager.OnPageChangeListener {
             override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
                 // 添加滚动相关的日志
             }
 
             override fun onPageSelected(position: Int) {
-                Log.d("AuToDark.MainActivity", "选中的页面: $position")
+                LogUtils.log(Log.DEBUG,"AuToDark.MainActivity", "选中的页面: $position")
 
                 if (menuItem != null) {
-                    Log.d("AuToDark.MainActivity", "取消选中菜单项: ${menuItem!!.itemId}")
+                    LogUtils.log(Log.DEBUG,"AuToDark.MainActivity", "取消选中菜单项: ${menuItem!!.itemId}")
                     menuItem!!.isChecked = false
                 } else {
-                    Log.d("AuToDark.MainActivity", "取消选中默认菜单项")
+                    LogUtils.log(Log.DEBUG,"AuToDark.MainActivity", "取消选中默认菜单项")
                     binding.bottomNavigation.menu.getItem(0).isChecked = false
                 }
 
                 menuItem = binding.bottomNavigation.menu.getItem(position)
-                Log.d("AuToDark.MainActivity", "选中菜单项: ${menuItem!!.itemId}")
+                LogUtils.log(Log.DEBUG,"AuToDark.MainActivity", "选中菜单项: ${menuItem!!.itemId}")
                 menuItem!!.isChecked = true
             }
 

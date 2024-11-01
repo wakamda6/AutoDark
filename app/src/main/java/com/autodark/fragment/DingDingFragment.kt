@@ -1,5 +1,6 @@
 package com.autodark.fragment
 
+import com.autodark.utils.LogUtils
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -35,48 +36,48 @@ class DingDingFragment : KotlinBaseFragment<FragmentDingdingBinding>() {
 
     override fun setupTopBarLayout() {
         // 初始化状态栏，设置沉浸式效果
-        Log.d(kTag, "setupTopBarLayout: 初始化状态栏")
+        LogUtils.log(Log.DEBUG,kTag, "setupTopBarLayout: 初始化状态栏")
         binding.rootView.initImmersionBar(this, true, R.color.white)
     }
 
     override fun observeRequestState() {
         // 观察请求状态，可用于更新UI或处理数据
-        Log.d(kTag, "observeRequestState: 观察请求状态")
+        LogUtils.log(Log.DEBUG,kTag, "observeRequestState: 观察请求状态")
     }
 
     override fun initViewBinding(
         inflater: LayoutInflater, container: ViewGroup?
     ): FragmentDingdingBinding {
         // 初始化视图绑定
-        Log.d(kTag, "initViewBinding: 初始化视图绑定")
+        LogUtils.log(Log.DEBUG,kTag, "initViewBinding: 初始化视图绑定")
         return FragmentDingdingBinding.inflate(inflater, container, false)
     }
 
     override fun initOnCreate(savedInstanceState: Bundle?) {
         // 在Fragment创建时获取自动钉钉任务
-        Log.d(kTag, "initOnCreate: 获取自动钉钉任务")
+        LogUtils.log(Log.DEBUG,kTag, "initOnCreate: 获取自动钉钉任务")
         getAutoDingDingTasks(false)
     }
 
     private fun getAutoDingDingTasks(isRefresh: Boolean) {
         // 查询数据库中的打卡任务，并更新UI
-        Log.d(kTag, "getAutoDingDingTasks: isRefresh = $isRefresh")
+        LogUtils.log(Log.DEBUG,kTag, "getAutoDingDingTasks: isRefresh = $isRefresh")
         val queryResult = dateTimeBeanDao.queryBuilder().orderDesc(
             com.autodark.greendao.DateTimeBeanDao.Properties.Date
         ).list()
 
         // 根据任务数量显示空视图或隐藏空视图
         if (queryResult.isEmpty()) {
-            Log.d(kTag, "getAutoDingDingTasks: 任务列表为空")
+            LogUtils.log(Log.DEBUG,kTag, "getAutoDingDingTasks: 任务列表为空")
             binding.emptyView.visibility = View.VISIBLE
         } else {
-            Log.d(kTag, "getAutoDingDingTasks: 任务数量 = ${queryResult.size}")
+            LogUtils.log(Log.DEBUG,kTag, "getAutoDingDingTasks: 任务数量 = ${queryResult.size}")
             binding.emptyView.visibility = View.GONE
         }
 
         if (isRefresh) {
             // 刷新适配器数据
-            Log.d(kTag, "getAutoDingDingTasks: 刷新适配器数据")
+            LogUtils.log(Log.DEBUG,kTag, "getAutoDingDingTasks: 刷新适配器数据")
             dateTimeAdapter.setRefreshData(queryResult)
         } else {
             // 初始化适配器并设置RecyclerView
@@ -92,7 +93,7 @@ class DingDingFragment : KotlinBaseFragment<FragmentDingdingBinding>() {
             dateTimeAdapter.setOnItemClickListener(object : DateTimeAdapter.OnItemClickListener {
                 override fun onItemClick(position: Int) {
                     // 处理打卡任务点击事件
-                    Log.d(kTag, "onItemClick: 修改打卡任务，position = $position")
+                    LogUtils.log(Log.DEBUG,kTag, "onItemClick: 修改打卡任务，position = $position")
                     AlertControlDialog.Builder()
                         .setContext(requireContext())
                         .setTitle("修改打卡任务")
@@ -113,7 +114,7 @@ class DingDingFragment : KotlinBaseFragment<FragmentDingdingBinding>() {
                                             dateTimeBean.weekDay = dateTimeBean.date.convertToWeek()
 
                                             dateTimeBeanDao.update(dateTimeBean)
-                                            Log.d(kTag, "onTimePicked: 更新打卡任务成功，任务 = $dateTimeBean")
+                                            LogUtils.log(Log.DEBUG,kTag, "onTimePicked: 更新打卡任务成功，任务 = $dateTimeBean")
                                             // 刷新列表
                                             getAutoDingDingTasks(true)
                                         }
@@ -122,7 +123,7 @@ class DingDingFragment : KotlinBaseFragment<FragmentDingdingBinding>() {
 
                             override fun onCancelClick() {
                                 // 处理取消事件，修改日期
-                                Log.d(kTag, "onCancelClick: 取消修改打卡任务时间")
+                                LogUtils.log(Log.DEBUG,kTag, "onCancelClick: 取消修改打卡任务时间")
                                 val dateTimeBean = dataBeans[position]
                                 requireActivity().showDatePicker(
                                     dateTimeBean, object : OnDateSelectedCallback {
@@ -131,7 +132,7 @@ class DingDingFragment : KotlinBaseFragment<FragmentDingdingBinding>() {
                                             dateTimeBean.weekDay = dateTimeBean.date.convertToWeek()
 
                                             dateTimeBeanDao.update(dateTimeBean)
-                                            Log.d(kTag, "onTimePicked: 更新打卡任务日期成功，任务 = $dateTimeBean")
+                                            LogUtils.log(Log.DEBUG,kTag, "onTimePicked: 更新打卡任务日期成功，任务 = $dateTimeBean")
                                             // 刷新列表
                                             getAutoDingDingTasks(true)
                                         }
@@ -143,7 +144,7 @@ class DingDingFragment : KotlinBaseFragment<FragmentDingdingBinding>() {
                 override fun onItemLongClick(position: Int) {
                     // 长按事件，标记被点击的item位置
                     clickedPosition = position
-                    Log.d(kTag, "onItemLongClick: 删除任务，position = $position")
+                    LogUtils.log(Log.DEBUG,kTag, "onItemLongClick: 删除任务，position = $position")
                     AlertControlDialog.Builder().setContext(requireContext()).setTitle("删除提示")
                         .setMessage("确定要删除这个任务吗").setNegativeButton("取消")
                         .setPositiveButton("确定").setOnDialogButtonClickListener(object :
@@ -155,14 +156,14 @@ class DingDingFragment : KotlinBaseFragment<FragmentDingdingBinding>() {
 
                             override fun onCancelClick() {
                                 // 取消删除
-                                Log.d(kTag, "onCancelClick: 取消删除任务")
+                                LogUtils.log(Log.DEBUG,kTag, "onCancelClick: 取消删除任务")
                             }
                         }).build().show()
                 }
 
                 override fun onCountDownFinish() {
                     // 倒计时结束，打开钉钉应用
-                    Log.d(kTag, "onCountDownFinish: 倒计时结束，打开钉钉应用")
+                    LogUtils.log(Log.DEBUG,kTag, "onCountDownFinish: 倒计时结束，打开钉钉应用")
                     requireContext().openApplication(Constant.DING_DING)
                 }
             })
@@ -171,7 +172,7 @@ class DingDingFragment : KotlinBaseFragment<FragmentDingdingBinding>() {
 
     private fun deleteTask(bean: com.autodark.bean.DateTimeBean) {
         // 删除指定任务并更新UI
-        Log.d(kTag, "deleteTask: 删除任务 = $bean")
+        LogUtils.log(Log.DEBUG,kTag, "deleteTask: 删除任务 = $bean")
         dateTimeBeanDao.delete(bean)
         dataBeans.removeAt(clickedPosition)
         dateTimeAdapter.notifyItemRemoved(clickedPosition)
@@ -181,10 +182,10 @@ class DingDingFragment : KotlinBaseFragment<FragmentDingdingBinding>() {
         dateTimeAdapter.stopCountDownTimer(bean)
         // 根据任务数量显示空视图或隐藏空视图
         if (dataBeans.isEmpty()) {
-            Log.d(kTag, "deleteTask: 任务列表已为空")
+            LogUtils.log(Log.DEBUG,kTag, "deleteTask: 任务列表已为空")
             binding.emptyView.visibility = View.VISIBLE
         } else {
-            Log.d(kTag, "deleteTask: 任务列表不为空，当前任务数量 = ${dataBeans.size}")
+            LogUtils.log(Log.DEBUG,kTag, "deleteTask: 任务列表不为空，当前任务数量 = ${dataBeans.size}")
             binding.emptyView.visibility = View.GONE
         }
     }
@@ -192,7 +193,7 @@ class DingDingFragment : KotlinBaseFragment<FragmentDingdingBinding>() {
     override fun initEvent() {
         // 初始化添加计时器按钮的点击事件
         binding.addTimerButton.setOnClickListener {
-            Log.d(kTag, "initEvent: 添加计时器按钮被点击")
+            LogUtils.log(Log.DEBUG,kTag, "initEvent: 添加计时器按钮被点击")
             requireActivity().showDateTimePicker(null, object : OnDateSelectedCallback {
                 override fun onTimePicked(vararg args: String) {
                     // 创建新打卡任务
@@ -203,7 +204,7 @@ class DingDingFragment : KotlinBaseFragment<FragmentDingdingBinding>() {
                     bean.weekDay = bean.date.convertToWeek()
 
                     dateTimeBeanDao.insert(bean)
-                    Log.d(kTag, "onTimePicked: 新任务已创建，任务 = $bean")
+                    LogUtils.log(Log.DEBUG,kTag, "onTimePicked: 新任务已创建，任务 = $bean")
                     // 刷新列表
                     getAutoDingDingTasks(true)
                 }
@@ -214,7 +215,7 @@ class DingDingFragment : KotlinBaseFragment<FragmentDingdingBinding>() {
     override fun onDestroyView() {
         super.onDestroyView()
         // 停止所有计时器
-        Log.d(kTag, "onDestroyView: 停止所有计时器")
+        LogUtils.log(Log.DEBUG,kTag, "onDestroyView: 停止所有计时器")
         dataBeans.forEach {
             dateTimeAdapter.stopCountDownTimer(it)
         }
@@ -225,7 +226,7 @@ class DingDingFragment : KotlinBaseFragment<FragmentDingdingBinding>() {
      * */
     private fun randomSeconds(): String {
         val seconds = (0 until 60).random().appendZero()
-        Log.d(kTag, "randomSeconds: 产生随机秒数 = $seconds")
+        LogUtils.log(Log.DEBUG,kTag, "randomSeconds: 产生随机秒数 = $seconds")
         return seconds
     }
 }

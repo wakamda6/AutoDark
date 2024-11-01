@@ -1,5 +1,6 @@
 package com.autodark.adapter
 
+import com.autodark.utils.LogUtils
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
@@ -24,7 +25,7 @@ class DateTimeAdapter(context: Context, private val dataBeans: MutableList<com.a
 
     @SuppressLint("NotifyDataSetChanged")
     fun setRefreshData(dataRows: MutableList<com.autodark.bean.DateTimeBean>) {
-        Log.d(kTag, "刷新数据，新的数据行数量: ${dataRows.size}")
+        LogUtils.log(Log.DEBUG,kTag, "刷新数据，新的数据行数量: ${dataRows.size}")
         this.dataBeans.clear()
         this.dataBeans.addAll(dataRows)
         notifyDataSetChanged()

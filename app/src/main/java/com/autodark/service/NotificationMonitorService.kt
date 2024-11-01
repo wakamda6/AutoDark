@@ -1,5 +1,6 @@
 package com.autodark.service
 
+import com.autodark.utils.LogUtils
 import android.app.Notification
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -45,7 +46,7 @@ import java.util.UUID
             override fun onReceive(context: Context?, intent: Intent?) {
                 // 处理广播
                 val message = intent?.getStringExtra("message")
-                Log.d("NotificationMonitorService", "Received message: $message")
+                LogUtils.log(Log.DEBUG,"NotificationMonitorService", "Received message: $message")
             }
         }
 
@@ -79,7 +80,7 @@ import java.util.UUID
      * 有可用的并且和通知管理器连接成功时回调
      */
     override fun onListenerConnected() {
-        Log.d(kTag, "onListenerConnected: 通知监听服务运行中")
+        LogUtils.log(Log.DEBUG,kTag, "onListenerConnected: 通知监听服务运行中")
         SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
     }
 
@@ -87,7 +88,7 @@ import java.util.UUID
      * 当有新通知到来时会回调
      */
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        Log.d(kTag, "onNotificationPosted: 收到新通知")
+        LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 收到新通知")
 
         val extras = sbn.notification.extras
         // 获取接收消息APP的包名
@@ -98,11 +99,11 @@ import java.util.UUID
         val notice = extras.getString(Notification.EXTRA_TEXT)
 
         if (notice.isNullOrBlank()) {
-            Log.d(kTag, "onNotificationPosted: 通知内容为空，忽略")
+            LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 通知内容为空，忽略")
             return
         }
 
-        Log.d(kTag, "onNotificationPosted: 内容 - $notice")
+        LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 内容 - $notice")
         SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
 
         val notificationBean = com.autodark.bean.NotificationBean().apply {
@@ -114,11 +115,11 @@ import java.util.UUID
         }
 
         notificationBeanDao.save(notificationBean)
-        Log.d(kTag, "onNotificationPosted: 保存通知信息至数据库")
+        LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 保存通知信息至数据库")
 
         val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
         if (emailAddress.isEmpty()) {
-            Log.d(kTag, "onNotificationPosted: 邮箱地址为空")
+            LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 邮箱地址为空")
             "邮箱地址为空".show(this)
             return
         }
@@ -136,7 +137,7 @@ import java.util.UUID
                             Constant.EMAIL_TITLE, "打卡结果通知"
                         ) as String
                         notice.createTextMail(subject, emailAddress).sendTextMail()
-                        Log.d(kTag, "onNotificationPosted: 邮件发送成功")
+                        LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 邮件发送成功")
                     }
                 }
 
@@ -153,13 +154,13 @@ import java.util.UUID
                     "当前手机剩余电量为：${capacity}%".createTextMail(
                         "查询手机电量通知", emailAddress
                     ).sendTextMail()
-                    Log.d(kTag, "onNotificationPosted: 电量邮件发送，剩余电量: $capacity%")
+                    LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 电量邮件发送，剩余电量: $capacity%")
                 }
             } else {
                 val key = SaveKeyValues.getValue(Constant.DING_DING_KEY, "打卡") as String
                 if (notice.contains(key)) {
                     openApplication(Constant.DING_DING)
-                    Log.d(kTag, "onNotificationPosted: 打开钉钉应用")
+                    LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 打开钉钉应用")
                 }
             }
         }
@@ -175,7 +176,7 @@ import java.util.UUID
                 addCategory(Intent.CATEGORY_HOME)
             }
             startActivity(home)
-            Log.d(kTag, "backToMainActivity: 模拟点击Home键")
+            LogUtils.log(Log.DEBUG,kTag, "backToMainActivity: 模拟点击Home键")
             delay(1000)
         }
 
@@ -183,18 +184,18 @@ import java.util.UUID
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         startActivity(intent)
-        Log.d(kTag, "backToMainActivity: 返回主活动")
+        LogUtils.log(Log.DEBUG,kTag, "backToMainActivity: 返回主活动")
     }
 
     /**
      * 当有通知移除时会回调
      */
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        Log.d(kTag, "onNotificationRemoved: 通知已移除")
+        LogUtils.log(Log.DEBUG,kTag, "onNotificationRemoved: 通知已移除")
     }
 
     override fun onListenerDisconnected() {
-        Log.d(kTag, "onListenerDisconnected: 通知监听服务已关闭")
+        LogUtils.log(Log.DEBUG,kTag, "onListenerDisconnected: 通知监听服务已关闭")
         SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090802)
     }
 }

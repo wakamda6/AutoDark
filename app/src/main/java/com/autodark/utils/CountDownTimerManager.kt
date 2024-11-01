@@ -1,5 +1,6 @@
 package com.autodark.utils
 
+import com.autodark.utils.LogUtils
 import android.content.Context
 import android.content.Intent
 import android.os.CountDownTimer
@@ -40,7 +41,7 @@ class CountDownTimerManager private constructor() : LifecycleOwner {
     private var timer: CountDownTimer? = null
 
     fun startTimer(context: Context, millisInFuture: Long, countDownInterval: Long) {
-        Log.d(kTag, "startTimer: 开始倒计时")
+        LogUtils.log(Log.DEBUG,kTag, "startTimer: 开始倒计时")
         timer = object : CountDownTimer(millisInFuture, countDownInterval) {
             override fun onTick(millisUntilFinished: Long) {
                 val tick = millisUntilFinished / 1000
@@ -60,7 +61,7 @@ class CountDownTimerManager private constructor() : LifecycleOwner {
                         home.flags = Intent.FLAG_ACTIVITY_NEW_TASK
                         home.addCategory(Intent.CATEGORY_HOME)
                         context.startActivity(home)
-                        Log.d(kTag, "onFinish: 模拟点击Home键")
+                        LogUtils.log(Log.DEBUG,kTag, "onFinish: 模拟点击Home键")
 
                         delay(1000)
                     }
@@ -91,7 +92,7 @@ class CountDownTimerManager private constructor() : LifecycleOwner {
     }
 
     private fun sendBroadcast(context: Context, message: String) {
-        Log.d(kTag, "发送打卡结果:$message")
+        LogUtils.log(Log.DEBUG,kTag, "发送打卡结果:$message")
         val intent = Intent("com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION")
         intent.putExtra("message", message)
         LocalBroadcastManager.getInstance(context).sendBroadcast(intent) // 发送本地广播
@@ -99,6 +100,6 @@ class CountDownTimerManager private constructor() : LifecycleOwner {
 
     fun cancelTimer() {
         timer?.cancel()
-        Log.d(kTag, "cancelTimer: 取消超时定时器")
+        LogUtils.log(Log.DEBUG,kTag, "cancelTimer: 取消超时定时器")
     }
 }

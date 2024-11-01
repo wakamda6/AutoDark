@@ -17,6 +17,7 @@ import com.pengxh.kt.lite.extensions.readAssetsFile
 import com.pengxh.kt.lite.utils.ActivityStackManager
 import com.pengxh.kt.lite.utils.HtmlRenderEngine
 import com.pengxh.kt.lite.widget.TitleBarView
+import com.autodark.utils.LogUtils
 
 class QuestionAndAnswerActivity : KotlinBaseActivity<ActivityQuestionAndAnswerBinding>() {
 
@@ -28,24 +29,24 @@ class QuestionAndAnswerActivity : KotlinBaseActivity<ActivityQuestionAndAnswerBi
     }
 
     override fun initOnCreate(savedInstanceState: Bundle?) {
-        Log.d("AuToDark.initOnCreate", "初始化活动")
+        LogUtils.log(Log.DEBUG,"AuToDark.initOnCreate", "初始化活动")
 
         ActivityStackManager.addActivity(this)
-        Log.d("AuToDark.initOnCreate", "活动添加到栈中")
+        LogUtils.log(Log.DEBUG,"AuToDark.initOnCreate", "活动添加到栈中")
 
         binding.marqueeView.requestFocus()
-        Log.d("AuToDark.initOnCreate", "请求焦点到滚动视图")
+        LogUtils.log(Log.DEBUG,"AuToDark.initOnCreate", "请求焦点到滚动视图")
 
         val assetsFile = readAssetsFile("QuestionAndAnswer.json")
-        Log.d("AuToDark.initOnCreate", "读取资产文件: QuestionAndAnswer.json")
+        LogUtils.log(Log.DEBUG,"AuToDark.initOnCreate", "读取资产文件: QuestionAndAnswer.json")
 
         val dataRows = gson.fromJson<MutableList<com.autodark.model.QuestionAnAnswerModel>>(
             assetsFile, object : TypeToken<MutableList<com.autodark.model.QuestionAnAnswerModel>>() {}.type
         )
-        Log.d("AuToDark.initOnCreate", "解析 JSON 数据，数据行数量: ${dataRows.size}")
+        LogUtils.log(Log.DEBUG,"AuToDark.initOnCreate", "解析 JSON 数据，数据行数量: ${dataRows.size}")
 
         binding.recyclerView.addItemDecoration(RecyclerViewItemDivider(1, Color.LTGRAY))
-        Log.d("AuToDark.initOnCreate", "为 RecyclerView 添加分隔线")
+        LogUtils.log(Log.DEBUG,"AuToDark.initOnCreate", "为 RecyclerView 添加分隔线")
 
         binding.recyclerView.adapter = object :
             NormalRecyclerAdapter<com.autodark.model.QuestionAnAnswerModel>(R.layout.item_q_a_rv_l, dataRows) {
@@ -61,10 +62,10 @@ class QuestionAndAnswerActivity : KotlinBaseActivity<ActivityQuestionAndAnswerBi
                     .setOnGetImageSourceListener(object :
                         HtmlRenderEngine.OnGetImageSourceListener {
                         override fun imageSource(url: String) {
-                            Log.d("AuToDark.initOnCreate", "获取图片源: $url")
+                            LogUtils.log(Log.DEBUG,"AuToDark.initOnCreate", "获取图片源: $url")
                         }
                     }).build().load()
-                Log.d("AuToDark.initOnCreate", "设置问题和答案视图，问题: ${item.question}")
+                LogUtils.log(Log.DEBUG,"AuToDark.initOnCreate", "设置问题和答案视图，问题: ${item.question}")
             }
         }
     }
@@ -79,21 +80,21 @@ class QuestionAndAnswerActivity : KotlinBaseActivity<ActivityQuestionAndAnswerBi
     }
 
     override fun setupTopBarLayout() {
-        Log.d("AuToDark.setupTopBarLayout", "设置顶部导航栏布局")
+        LogUtils.log(Log.DEBUG,"AuToDark.setupTopBarLayout", "设置顶部导航栏布局")
 
         // 初始化沉浸式状态栏
         binding.rootView.initImmersionBar(this, true, R.color.white)
-        Log.d("AuToDark.setupTopBarLayout", "沉浸式状态栏已初始化，背景颜色设置为白色")
+        LogUtils.log(Log.DEBUG,"AuToDark.setupTopBarLayout", "沉浸式状态栏已初始化，背景颜色设置为白色")
 
         // 设置标题栏点击事件
         binding.titleView.setOnClickListener(object : TitleBarView.OnClickListener {
             override fun onLeftClick() {
-                Log.d("AuToDark.setupTopBarLayout", "左侧按钮点击，结束当前活动")
+                LogUtils.log(Log.DEBUG,"AuToDark.setupTopBarLayout", "左侧按钮点击，结束当前活动")
                 finish()
             }
 
             override fun onRightClick() {
-                Log.d("AuToDark.setupTopBarLayout", "右侧按钮点击，执行相应操作")
+                LogUtils.log(Log.DEBUG,"AuToDark.setupTopBarLayout", "右侧按钮点击，执行相应操作")
                 // 此处可以添加右侧按钮的操作
             }
         })

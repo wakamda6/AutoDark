@@ -7,11 +7,9 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.Network
 import android.os.*
-import android.util.Log
 import androidx.annotation.RequiresApi
 import com.autodark.extensions.openApplication
 import com.autodark.ui.MainActivity
@@ -23,6 +21,8 @@ import info.mqtt.android.service.MqttAndroidClient
 import org.eclipse.paho.client.mqttv3.*
 import java.io.IOException
 import java.util.*
+import com.autodark.utils.LogUtils
+import android.util.Log
 
 class MqttService : Service() {
 
@@ -77,30 +77,30 @@ class MqttService : Service() {
         startForegroundService()
 
         // MQTT 配置文件导入
-        Log.d("AuToDark.connectToMqtt", "加载 MQTT 配置")
+        LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "加载 MQTT 配置")
         loadProperties()
 
         // 初始化 ConnectivityManager 和 NetworkCallback
         connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                Log.d("AuToDark.NetworkChangeReceiver.onReceive", "网络连接可用")
+                LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onReceive", "网络连接可用")
 
                 // 检查 MQTT 客户端是否已连接
                 if (!isMqttConnected() && !isConnecting){
-                    Log.d("AuToDark.NetworkChangeReceiver.onReceive", "MQTT 尚未连接，尝试连接")
+                    LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onReceive", "MQTT 尚未连接，尝试连接")
                     connectToMqtt()
                 }else{
-                    Log.d("AuToDark.NetworkChangeReceiver.onReceive", "MQTT 已连接")
+                    LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onReceive", "MQTT 已连接")
                 }
             }
 
             override fun onLost(network: Network) {
                 // 网络丢失时可以选择执行其他操作
-                Log.d("MqttService", "网络丢失,正在取消连接")
+                LogUtils.log(Log.DEBUG,"MqttService", "网络丢失,正在取消连接")
                 if (!isMqttConnected()) {
                     mqttClient.disconnect()
-                    Log.d("MqttService", "MQTT 连接已断开")
+                    LogUtils.log(Log.DEBUG,"MqttService", "MQTT 连接已断开")
                 }
             }
         }
@@ -109,10 +109,10 @@ class MqttService : Service() {
 
         //连接
         if (!isMqttConnected() && !isConnecting){
-            Log.d("AuToDark.NetworkChangeReceiver.onReceive", "MQTT 尚未连接，尝试连接")
+            LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onReceive", "MQTT 尚未连接，尝试连接")
             connectToMqtt()
         }else{
-            Log.d("AuToDark.NetworkChangeReceiver.onReceive", "MQTT 已连接")
+            LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onReceive", "MQTT 已连接")
         }
     }
 
@@ -172,15 +172,15 @@ class MqttService : Service() {
     }
 
     fun connectToMqtt() {
-        Log.d("AuToDark.connectToMqtt", "尝试连接到 MQTT 代理")
+        LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "尝试连接到 MQTT 代理")
 
         if (isMqttConnected() || isConnecting) {
-            Log.d("AuToDark.connectToMqtt", "已经连接或正在连接中，取消连接请求")
+            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "已经连接或正在连接中，取消连接请求")
             return
         }
 
         isConnecting = true
-        Log.d("AuToDark.connectToMqtt", "设置连接状态为正在连接")
+        LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "设置连接状态为正在连接")
 
         // 确保网络连接
         if (!NetworkUtils.isNetworkAvailable(this)) {
@@ -207,10 +207,10 @@ class MqttService : Service() {
         }
 
         try {
-            Log.d("AuToDark.connectToMqtt", "连接到 MQTT 代理: $mqttServerUrl")
+            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "连接到 MQTT 代理: $mqttServerUrl")
             mqttClient.connect(options, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
-                    Log.d("AuToDark.connectToMqtt", "MQTT 连接成功")
+                    LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "MQTT 连接成功")
                     isConnecting = false
 
                     val topicsToSubscribe = arrayOf(mqttTopicTest, mqttTopicCheckAppAlive,mqttTopicDark)
@@ -234,19 +234,19 @@ class MqttService : Service() {
             override fun messageArrived(topic: String?, message: MqttMessage?) {
                 message?.let {
                     val msg = String(it.payload) // 将消息体转换为字符串
-                    Log.d("AuToDark.connectToMqtt", "收到主题 $topic 的消息: $msg")
+                    LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "收到主题 $topic 的消息: $msg")
 
                     when (topic) {
                         mqttTopicDark -> {
-                            Log.d("AuToDark.connectToMqtt", "处理主题 $mqttTopicDark 的消息，打开相关应用")
+                            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "处理主题 $mqttTopicDark 的消息，打开相关应用")
                             openApplication(Constant.DING_DING)
                         }
                         mqttTopicTest -> {
-                            Log.d("AuToDark.connectToMqtt", "处理主题 $mqttTopicTest 的消息，发布测试消息")
+                            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "处理主题 $mqttTopicTest 的消息，发布测试消息")
                             publishMessage(mqttTopicTestResult, "darkPhone_testCheck", 1)
                         }
                         mqttTopicCheckAppAlive -> {
-                            Log.d("AuToDark.connectToMqtt", "处理主题 $mqttTopicCheckAppAlive 的消息，检查订阅主题的设备是否都正常连接")
+                            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "处理主题 $mqttTopicCheckAppAlive 的消息，检查订阅主题的设备是否都正常连接")
                             publishMessage(mqttTopicCheckAppAliveResult, "darkPhone_alive", 1)
                         }
                         else -> {
@@ -263,11 +263,11 @@ class MqttService : Service() {
     }
 
     fun isMqttConnected(): Boolean {
-        Log.d("AuToDark.connectToMqtt", "检查 MQTT 连接状态")
+        LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "检查 MQTT 连接状态")
 
         return try {
             val isConnected = ::mqttClient.isInitialized && mqttClient.isConnected
-            Log.d("AuToDark.connectToMqtt", "MQTT 连接状态: $isConnected")
+            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "MQTT 连接状态: $isConnected")
             isConnected
         } catch (e: UninitializedPropertyAccessException) {
             Log.e("AuToDark.connectToMqtt", "MQTT 客户端未初始化，连接状态为 false")
@@ -280,7 +280,7 @@ class MqttService : Service() {
         try {
             mqttClient.subscribe(topics, qos, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
-                    Log.d("AuToDark.connectToMqtt", "成功订阅主题: ${topics.joinToString(", ")}")
+                    LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "成功订阅主题: ${topics.joinToString(", ")}")
                     callback?.onMqttStatusChanged("成功订阅主题: ${topics.joinToString(", ")}")
                 }
 
@@ -298,12 +298,12 @@ class MqttService : Service() {
 
     //mqtt解除订阅
     private fun unsubscribeFromTopics(topics: Array<String>) {
-        Log.d("AuToDark.connectToMqtt", "尝试解除订阅主题: ${topics.joinToString(", ")}")
+        LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "尝试解除订阅主题: ${topics.joinToString(", ")}")
 
         try {
             mqttClient.unsubscribe(topics, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
-                    Log.d("AuToDark.connectToMqtt", "成功解除订阅主题: ${topics.joinToString(", ")}")
+                    LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "成功解除订阅主题: ${topics.joinToString(", ")}")
                 }
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
@@ -319,14 +319,14 @@ class MqttService : Service() {
 
     //mqtt 发布
     fun publishMessage(topic: String, message: String, qos: Int = 1) {
-        Log.d("AuToDark.connectToMqtt", "尝试发布消息到主题 $topic: $message")
+        LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "尝试发布消息到主题 $topic: $message")
 
         try {
             val mqttMessage = MqttMessage(message.toByteArray()).apply {
                 this.qos = qos // 设置质量服务级别
             }
             mqttClient.publish(topic, mqttMessage, null, null)
-            Log.d("AuToDark.connectToMqtt", "消息发布成功: $message")
+            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "消息发布成功: $message")
         } catch (e: MqttException) {
             Log.e("AuToDark.connectToMqtt", "消息发布失败: ${e.message}")
         }
