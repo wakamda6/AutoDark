@@ -286,18 +286,16 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
 
         when (msg.what) {
             2024090801 -> {
-                LogUtils.log(Log.DEBUG,"AuToDark.SettingsFragment.handleMessage", "处理消息: 服务运行中")
+                LogUtils.log(Log.DEBUG,"AuToDark.SettingsFragment.handleMessage", " 通知监听服务运行中")
                 "通知监听服务运行中".show(requireContext())
                 binding.noticeSwitch.isChecked = true
                 binding.tipsView.visibility = View.GONE
-                LogUtils.log(Log.DEBUG,"AuToDark.SettingsFragment.handleMessage", "通知开关状态: ${binding.noticeSwitch.isChecked}, 提示视图隐藏")
             }
             2024090802 -> {
-                LogUtils.log(Log.DEBUG,"AuToDark.SettingsFragment.handleMessage", "处理消息: 服务已关闭")
+                LogUtils.log(Log.DEBUG,"AuToDark.SettingsFragment.handleMessage", " 通知监听服务已关闭")
                 "通知监听服务已关闭".show(requireContext())
                 binding.noticeSwitch.isChecked = false
                 binding.tipsView.visibility = View.VISIBLE
-                LogUtils.log(Log.DEBUG,"AuToDark.SettingsFragment.handleMessage", "通知开关状态: ${binding.noticeSwitch.isChecked}, 提示视图显示")
             }
             else -> {
                 LogUtils.log(Log.DEBUG,"AuToDark.SettingsFragment.handleMessage", "未知消息类型: ${msg.what}")

@@ -79,9 +79,22 @@ import java.util.UUID
     /**
      * 有可用的并且和通知管理器连接成功时回调
      */
+    private var isInitialized = false
     override fun onListenerConnected() {
-        LogUtils.log(Log.DEBUG,kTag, "onListenerConnected: 通知监听服务运行中")
-        SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
+        try {
+            if (!isInitialized) {
+                isInitialized = true
+                LogUtils.log(Log.DEBUG,kTag, "onListenerConnected: 通知监听服务初始化")
+                SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
+            }else{
+                LogUtils.log(Log.DEBUG,kTag, "onListenerConnected: 通知监听服务已经初始化,不再初始化...")
+            }
+        } catch (e: Exception) {
+            LogUtils.log(Log.ERROR, kTag, "发生异常: ${e.message}")
+            isInitialized = false // 允许重新注册
+            // 其他错误处理逻辑
+        }
+
     }
 
     /**
@@ -99,11 +112,12 @@ import java.util.UUID
         val notice = extras.getString(Notification.EXTRA_TEXT)
 
         if (notice.isNullOrBlank()) {
+            LogUtils.log(Log.DEBUG, kTag, "通知发出者包名: $packageName")
             LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 通知内容为空，忽略")
             return
         }
 
-        LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 内容 - $notice")
+        LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 内容 : $notice")
         SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
 
         val notificationBean = com.autodark.bean.NotificationBean().apply {
@@ -197,5 +211,6 @@ import java.util.UUID
     override fun onListenerDisconnected() {
         LogUtils.log(Log.DEBUG,kTag, "onListenerDisconnected: 通知监听服务已关闭")
         SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090802)
+        isInitialized = false
     }
 }

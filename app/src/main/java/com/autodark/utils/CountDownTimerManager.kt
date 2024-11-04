@@ -15,6 +15,7 @@ import com.autodark.extensions.sendTextMail
 import com.autodark.service.FloatingWindowService
 import com.autodark.ui.MainActivity
 import com.pengxh.kt.lite.extensions.show
+import com.pengxh.kt.lite.extensions.timestampToCompleteDate
 import com.pengxh.kt.lite.extensions.timestampToTime
 import com.pengxh.kt.lite.utils.SaveKeyValues
 import kotlinx.coroutines.Dispatchers
@@ -85,7 +86,7 @@ class CountDownTimerManager private constructor() : LifecycleOwner {
                     }
 
                     //通过mqtt发送
-                    sendBroadcast(context, "未监听到打卡成功的通知" + System.currentTimeMillis().timestampToTime())
+                    sendBroadcast(context, "未监听到打卡成功的通知" + System.currentTimeMillis().timestampToCompleteDate())
                 }
             }
         }.start()

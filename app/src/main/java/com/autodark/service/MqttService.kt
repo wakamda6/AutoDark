@@ -23,6 +23,8 @@ import java.io.IOException
 import java.util.*
 import com.autodark.utils.LogUtils
 import android.util.Log
+import com.pengxh.kt.lite.extensions.timestampToCompleteDate
+import com.pengxh.kt.lite.extensions.timestampToDate
 
 class MqttService : Service() {
 
@@ -44,6 +46,15 @@ class MqttService : Service() {
 
     override fun onBind(intent: Intent?): IBinder {
         return binder
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+
+        // 创建一个 Intent 来重新启动服务
+        val restartServiceIntent = Intent(applicationContext, this::class.java)
+        restartServiceIntent.putExtra("restart", true) // 可选参数，用于传递信息
+        applicationContext.startService(restartServiceIntent) // 重新启动服务
     }
 
     private val channelId = "MqttServiceChannel"
@@ -97,10 +108,10 @@ class MqttService : Service() {
 
             override fun onLost(network: Network) {
                 // 网络丢失时可以选择执行其他操作
-                LogUtils.log(Log.DEBUG,"MqttService", "网络丢失,正在取消连接")
+                LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onLost", "网络丢失,正在取消连接")
                 if (!isMqttConnected()) {
                     mqttClient.disconnect()
-                    LogUtils.log(Log.DEBUG,"MqttService", "MQTT 连接已断开")
+                    LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onLost", "MQTT 连接已断开")
                 }
             }
         }
@@ -201,7 +212,7 @@ class MqttService : Service() {
             val willQoS = 1 // 设置 QoS 为 1
 
             // 获取当前时间戳
-            val willMessage = "darkPhone_offline_at_" + System.currentTimeMillis().timestampToTime()
+            val willMessage = "darkPhone_offline_at_" + System.currentTimeMillis().timestampToCompleteDate()
 
             setWill(mqttTopicLastWill, willMessage.toByteArray(), willQoS, true)
         }
@@ -246,7 +257,7 @@ class MqttService : Service() {
                             publishMessage(mqttTopicTestResult, "darkPhone_testCheck", 1)
                         }
                         mqttTopicCheckAppAlive -> {
-                            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "处理主题 $mqttTopicCheckAppAlive 的消息，检查订阅主题的设备是否都正常连接")
+                            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "处理主题 $mqttTopicCheckAppAlive 的消息，设备是否都正常连接")
                             publishMessage(mqttTopicCheckAppAliveResult, "darkPhone_alive", 1)
                         }
                         else -> {
@@ -331,14 +342,6 @@ class MqttService : Service() {
             Log.e("AuToDark.connectToMqtt", "消息发布失败: ${e.message}")
         }
     }
-
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        val restartServiceIntent = Intent(applicationContext, this.javaClass)
-        restartServiceIntent.putExtra("from_onTaskRemoved", true)
-        applicationContext.startService(restartServiceIntent)
-        super.onTaskRemoved(rootIntent)
-    }
-
 
     override fun onDestroy() {
         super.onDestroy()
