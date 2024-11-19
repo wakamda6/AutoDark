@@ -51,7 +51,8 @@
 
         <service
             android:name=".service.MqttService"
-            android:foregroundServiceType="dataSync" />
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
     </application>
 

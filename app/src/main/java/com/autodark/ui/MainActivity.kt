@@ -61,6 +61,13 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
         }
     }
 
+    private fun pushMqttLastMessage() {
+        if (isBound) {
+            mqttService.onDestroy()
+        }
+    }
+
+
     private lateinit var dingDingFragment: DingDingFragment
     private lateinit var settingsFragment: SettingsFragment
 
@@ -207,10 +214,12 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
 
 
     override fun onDestroy() {
+        LogUtils.log(Log.DEBUG,"AuToDark.onDestroy", "清理程序开始")
         super.onDestroy()
         if (isBound) {
             unbindService(serviceConnection)
             isBound = false
         }
+        pushMqttLastMessage()
     }
 }
