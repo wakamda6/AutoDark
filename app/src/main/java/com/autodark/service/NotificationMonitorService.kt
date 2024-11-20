@@ -101,7 +101,6 @@ import java.util.UUID
      * 当有新通知到来时会回调
      */
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 收到新通知")
 
         val extras = sbn.notification.extras
         // 获取接收消息APP的包名
@@ -111,13 +110,18 @@ import java.util.UUID
         // 获取接收消息的内容
         val notice = extras.getString(Notification.EXTRA_TEXT)
 
+        LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted收到新通知：$notice")
+
         if (notice.isNullOrBlank()) {
             LogUtils.log(Log.DEBUG, kTag, "通知发出者包名: $packageName")
             LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 通知内容为空，忽略")
             return
         }
 
-        LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 内容 : $notice")
+        if (notice.contains("正在监听MQTT消息")){
+            return
+        }
+
         SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
 
         val notificationBean = com.autodark.bean.NotificationBean().apply {

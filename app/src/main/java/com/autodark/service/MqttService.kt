@@ -89,16 +89,15 @@ class MqttService : Service(), Handler.Callback  {
                     LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onReceive", "网络连接可用，尝试连接mqtt服务器")
                     connectToMqtt()
                 }else{
-                    LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onReceive", "MQTT 已连接")
+                    LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onReceive", "网络连接可用，但MQTT 已连接")
                 }
             }
 
             override fun onLost(network: Network) {
                 // 网络丢失时可以选择执行其他操作
-                LogUtils.log(Log.WARN,"AuToDark.NetworkChangeReceiver.onLost", "网络丢失,正在主动断开连接")
                 if (!isMqttConnected()) {
                     mqttClient.disconnect()
-                    LogUtils.log(Log.WARN,"AuToDark.NetworkChangeReceiver.onLost", "MQTT 已主动断开连接")
+                    LogUtils.log(Log.WARN,"AuToDark.NetworkChangeReceiver.onLost", "网络丢失,MQTT 已主动断开连接")
                 }
             }
         }
