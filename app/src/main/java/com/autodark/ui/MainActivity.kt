@@ -1,5 +1,6 @@
 package com.autodark.ui
 
+import android.app.ActivityManager
 import android.content.*
 import android.os.Bundle
 import android.view.KeyEvent
@@ -35,13 +36,24 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
             isBound = true
             // 注册回调
             mqttService.setMyMqttCallback(this@MainActivity)
+            LogUtils.log(Log.DEBUG,"AuToDark.onServiceConnected", "MQTT前台服务已连接")
         }
         override fun onServiceDisconnected(name: ComponentName?) {
             isBound = false
+            LogUtils.log(Log.WARN,"AuToDark.onServiceDisconnected", "MQTT前台服务已断开")
         }
     }
     override fun onStart() {
         super.onStart()
+        // 检查服务是否存活，如果没有则启动
+        if (!isServiceRunning(MqttService::class.java)) {
+            LogUtils.log(Log.INFO, "MainActivity", "MQTT 服务未运行，正在启动")
+            startService(Intent(this, MqttService::class.java))
+        } else {
+            LogUtils.log(Log.INFO, "MainActivity", "MQTT 服务已运行")
+        }
+
+        // 绑定服务
         Intent(this, MqttService::class.java).also { intent ->
             bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
         }
@@ -60,13 +72,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
             mqttService.publishMessage(topic, message,qoS)
         }
     }
-
-    private fun pushMqttLastMessage() {
-        if (isBound) {
-            mqttService.onDestroy()
-        }
-    }
-
 
     private lateinit var dingDingFragment: DingDingFragment
     private lateinit var settingsFragment: SettingsFragment
@@ -200,6 +205,18 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
             }).build().show()
     }
 
+    //判断mqtt前台服务是否运行
+    private fun isServiceRunning(serviceClass: Class<*>): Boolean {
+        val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        for (service in manager.getRunningServices(Int.MAX_VALUE)) {
+            if (serviceClass.name == service.service.className) {
+                return true
+            }
+        }
+        return false
+    }
+
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         return if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (System.currentTimeMillis() - clickTime > 2000) {
@@ -212,6 +229,15 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
         } else super.onKeyDown(keyCode, event)
     }
 
+    override fun onStop() {
+        super.onStop()
+        if (isBound) {
+            LogUtils.log(Log.WARN, "AuToDark.onStop", "解绑 MQTT 服务，但保持运行")
+            unbindService(serviceConnection)
+            isBound = false
+        }
+    }
+
 
     override fun onDestroy() {
         LogUtils.log(Log.DEBUG,"AuToDark.onDestroy", "清理程序开始")
@@ -220,6 +246,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
             unbindService(serviceConnection)
             isBound = false
         }
-        pushMqttLastMessage()
+        // 停止服务
+        stopService(Intent(this, MqttService::class.java))
     }
 }
