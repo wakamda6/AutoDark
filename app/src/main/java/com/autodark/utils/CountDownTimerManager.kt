@@ -1,6 +1,5 @@
 package com.autodark.utils
 
-import com.autodark.utils.LogUtils
 import android.content.Context
 import android.content.Intent
 import android.os.CountDownTimer
@@ -16,7 +15,6 @@ import com.autodark.service.FloatingWindowService
 import com.autodark.ui.MainActivity
 import com.pengxh.kt.lite.extensions.show
 import com.pengxh.kt.lite.extensions.timestampToCompleteDate
-import com.pengxh.kt.lite.extensions.timestampToTime
 import com.pengxh.kt.lite.utils.SaveKeyValues
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -86,13 +84,13 @@ class CountDownTimerManager private constructor() : LifecycleOwner {
                     }
 
                     //通过mqtt发送
-                    sendBroadcast(context, "未监听到打卡成功的通知" + System.currentTimeMillis().timestampToCompleteDate())
+                    mSendBroadcast(context, "未监听到打卡成功的通知" + System.currentTimeMillis().timestampToCompleteDate())
                 }
             }
         }.start()
     }
 
-    private fun sendBroadcast(context: Context, message: String) {
+    private fun mSendBroadcast(context: Context, message: String) {
         LogUtils.log(Log.DEBUG,kTag, "发送打卡结果:$message")
         val intent = Intent("com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION")
         intent.putExtra("message", message)
