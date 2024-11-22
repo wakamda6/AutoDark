@@ -56,10 +56,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
         }
     }
 
-    override fun onStart() {
-        super.onStart()
-    }
-
     override fun initOnCreate(savedInstanceState: Bundle?) {
 
         // 初始化 LogUtils
@@ -104,7 +100,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
                 LogUtils.log(Log.DEBUG,kTag, "接收到来自应用内广播消息: $message")
                 if (intent?.action == "com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION") {
                     if (message != null) {
-                        pushMqttMessage("/topic/darkResult", message,1)
+                        pushMqttDarkResult( message,1)
                     }
                 }
             }
@@ -178,10 +174,10 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
         }
     }
 
-    fun pushMqttMessage(topic: String, message: String,qoS: Int) {
+    fun pushMqttDarkResult(message: String,qoS: Int) {
         // 调用发送消息的方法
         if (isBound) {
-            mqttService.publishMessage(topic, message,qoS)
+            mqttService.publishMqttDarkResult(message,qoS)
         }
     }
 
