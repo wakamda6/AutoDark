@@ -1,14 +1,14 @@
 package com.autodark.fragment
 
+import android.app.ActivityManager
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Message
 import android.provider.Settings
 import android.text.TextUtils
 import android.view.LayoutInflater
@@ -29,33 +29,21 @@ import com.pengxh.kt.lite.extensions.convertColor
 import com.pengxh.kt.lite.extensions.navigatePageTo
 import com.pengxh.kt.lite.extensions.setScreenBrightness
 import com.pengxh.kt.lite.utils.SaveKeyValues
-import com.pengxh.kt.lite.utils.WeakReferenceHandler
 import com.pengxh.kt.lite.widget.dialog.AlertInputDialog
 import com.pengxh.kt.lite.widget.dialog.BottomActionSheet
 import com.autodark.utils.LogUtils
 import android.util.Log
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 
-class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.Callback {
+class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
 
     private val kTag = "AuToDark.SettingsFragment"
-    companion object {
-        var weakReferenceHandler: WeakReferenceHandler? = null
-    }
 
     private val timeArray = arrayListOf("15s", "30s", "45s", "60s")
-
-    override fun setupTopBarLayout() {
-
-    }
-
-    override fun observeRequestState() {
-
-    }
 
     override fun initViewBinding(
         inflater: LayoutInflater, container: ViewGroup?
@@ -64,12 +52,7 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
     }
 
     override fun initOnCreate(savedInstanceState: Bundle?) {
-        LogUtils.log(Log.DEBUG,kTag, "第一次启用通知监听服务")
-        weakReferenceHandler = WeakReferenceHandler(this)
         binding.appVersion.text = com.autodark.BuildConfig.VERSION_NAME
-        if (requireContext().notificationEnable()) {
-            turnOnNotificationMonitorService()
-        }
     }
 
     override fun initEvent() {
@@ -250,13 +233,21 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
         }
     }
 
-
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 100) {
             if (requireContext().notificationEnable()) {
                 turnOnNotificationMonitorService()
-                LogUtils.log(Log.DEBUG,kTag, "重新启用通知监听服务")
+                binding.noticeSwitch.isChecked = true
+                binding.tipsView.visibility = View.GONE
+                LogUtils.log(Log.DEBUG,kTag, "启用通知监听服务")
+                LogUtils.log(Log.DEBUG,kTag, "通知监听按钮开启")
+            }else{
+                binding.noticeSwitch.isChecked = false
+                binding.tipsView.visibility = View.VISIBLE
+                binding.tipsView.setTextColor(R.color.red.convertColor(requireContext()))
+                LogUtils.log(Log.DEBUG,kTag, "通知监听服务未授权")
+                LogUtils.log(Log.DEBUG,kTag, "通知监听按钮关闭")
             }
         } else if (requestCode == 101) {
             binding.floatSwitch.isChecked = Settings.canDrawOverlays(requireContext())
@@ -264,46 +255,29 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
     }
 
     private fun turnOnNotificationMonitorService() {
-        lifecycleScope.launch(Dispatchers.IO){
-            requireContext().packageManager.setComponentEnabledSetting(
-                ComponentName(requireContext(), NotificationMonitorService::class.java),
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP
-            )
+        lifecycleScope.launch(Dispatchers.IO) {
+            // 获取 ActivityManager 实例
+            val activityManager = requireContext().getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val runningServices = activityManager.getRunningServices(Int.MAX_VALUE)
 
-            delay(1000)
-
-            requireContext().packageManager.setComponentEnabledSetting(
-                ComponentName(requireContext(), NotificationMonitorService::class.java),
-                PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP
-            )
-        }
-
-    }
-
-
-
-    override fun handleMessage(msg: Message): Boolean {
-        when (msg.what) {
-            2024090801 -> {
-                if (!binding.noticeSwitch.isChecked){
-                    binding.noticeSwitch.isChecked = true
-                    binding.tipsView.visibility = View.GONE
-                    LogUtils.log(Log.DEBUG,kTag, "开启通知监听按钮")
-                }else{
-                    //已开启，不需要再次开启
-                }
+            // 检查 NotificationMonitorService 是否在运行
+            val isServiceRunning = runningServices.any { service ->
+                service.service.className == NotificationMonitorService::class.java.name
             }
-            2024090802 -> {
-                if (binding.noticeSwitch.isChecked){
-                    binding.noticeSwitch.isChecked = false
-                    binding.tipsView.visibility = View.VISIBLE
-                    LogUtils.log(Log.DEBUG,kTag, "关闭通知监听按钮")
-                }else{
-                    //已关闭，不需要再次关闭
+
+            // 如果服务没有在运行，才启用该服务
+            if (!isServiceRunning) {
+                withContext(Dispatchers.Main) {
+                    requireContext().packageManager.setComponentEnabledSetting(
+                        ComponentName(requireContext(), NotificationMonitorService::class.java),
+                        PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                        PackageManager.DONT_KILL_APP
+                    )
                 }
+            }else{
+                LogUtils.log(Log.DEBUG,kTag, "通知监听服务已经运行中")
             }
         }
-        return true
     }
 
     override fun onResume() {
@@ -342,12 +316,23 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
         LogUtils.log(Log.DEBUG,kTag, "返回主界面开关状态: $backToHome")
 
         if (requireContext().notificationEnable()) {
-            binding.tipsView.setTextColor(R.color.purple_500.convertColor(requireContext()))
+            binding.noticeSwitch.isChecked = true
+            binding.tipsView.visibility = View.GONE
+            LogUtils.log(Log.DEBUG,kTag, "通知监听服务已开启")
         } else {
-            binding.tipsView.text = "通知监听服务未开启，无法监听打卡通知"
+            binding.noticeSwitch.isChecked = false
+            binding.tipsView.visibility = View.VISIBLE
             binding.tipsView.setTextColor(R.color.red.convertColor(requireContext()))
-            LogUtils.log(Log.DEBUG,kTag, "通知监听服务未开启")
+            LogUtils.log(Log.DEBUG,kTag, "通知监听服务未授权")
         }
+    }
+
+    override fun setupTopBarLayout() {
+
+    }
+
+    override fun observeRequestState() {
+
     }
 
 }

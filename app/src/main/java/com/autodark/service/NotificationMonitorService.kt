@@ -15,7 +15,6 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.autodark.extensions.createTextMail
 import com.autodark.extensions.openApplication
 import com.autodark.extensions.sendTextMail
-import com.autodark.fragment.SettingsFragment
 import com.autodark.ui.MainActivity
 import com.autodark.utils.Constant
 import com.autodark.utils.CountDownTimerManager
@@ -43,8 +42,6 @@ import java.util.UUID
         LocalBroadcastManager.getInstance(this).sendBroadcast(mIntent) // 发送本地广播
     }
 
-
-
     override fun getLifecycle(): Lifecycle {
         return registry
     }
@@ -57,13 +54,10 @@ import java.util.UUID
      */
     override fun onListenerConnected() {
         if (!isListenerConnected) {
-            LogUtils.log(Log.DEBUG, kTag, "通知监听服务初始化")
-            SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
-
-            // Set the flag to true, indicating the listener is connected
+            LogUtils.log(Log.DEBUG, kTag, "创建通知监听服务")
             isListenerConnected = true
         } else {
-            LogUtils.log(Log.DEBUG, kTag, "通知监听服务已经初始化，不需要重新连接")
+            LogUtils.log(Log.DEBUG, kTag, "通知监听服务已经创建")
         }
     }
 
@@ -94,9 +88,6 @@ import java.util.UUID
             return
         }
 
-        //检查并设置开启通知监听服务
-        SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
-
         val notificationBean = com.autodark.bean.NotificationBean().apply {
             uuid = UUID.randomUUID().toString()
             this.packageName = packageName
@@ -106,7 +97,6 @@ import java.util.UUID
         }
 
         notificationBeanDao.save(notificationBean)
-        LogUtils.log(Log.DEBUG,kTag, "保存通知信息至数据库")
 
         val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
         if (emailAddress.isEmpty()) {
@@ -187,7 +177,6 @@ import java.util.UUID
 
     override fun onListenerDisconnected() {
         isListenerConnected = false
-        SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090802)
         LogUtils.log(Log.DEBUG, kTag, "通知监听服务已销毁")
     }
 }

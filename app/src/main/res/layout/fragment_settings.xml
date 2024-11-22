@@ -203,7 +203,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/dp_3"
-                    android:text="通知监听服务未开启，无法监听打卡通知"
+                    android:text="通知监听服务未授权！开启授权才可以正常使用"
                     android:textColor="@color/red"
                     android:textSize="@dimen/sp_10" />
             </LinearLayout>

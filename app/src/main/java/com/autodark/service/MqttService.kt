@@ -22,6 +22,7 @@ import java.util.*
 import com.autodark.utils.LogUtils
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationCompat.PRIORITY_HIGH
 import androidx.core.content.ContextCompat
 import com.pengxh.kt.lite.extensions.timestampToCompleteDate
 import com.pengxh.kt.lite.utils.WeakReferenceHandler
@@ -51,7 +52,7 @@ class MqttService : Service(), Handler.Callback  {
     private lateinit var connectivityManager: ConnectivityManager
     private lateinit var networkCallback: ConnectivityManager.NetworkCallback
 
-    var isConnecting = false
+    private var isConnecting = false
     private var isConnected = false
 
     //前台显示运行时间
@@ -61,11 +62,27 @@ class MqttService : Service(), Handler.Callback  {
     private var runningTime = 0L
     private lateinit var updateRunnable: Runnable
 
+    //要和main activity进行通信
+    private var callback: MyMqttCallback? = null
+    interface MyMqttCallback {
+        fun onMqttStatusChanged(status: String)
+    }
+    fun setMyMqttCallback(cb: MyMqttCallback) {
+        this.callback = cb
+    }
+
+    //要和main activity进行绑定
+    private val binder = MqttBinder()
+    inner class MqttBinder : Binder() {
+        fun getService(): MqttService = this@MqttService
+    }
+    override fun onBind(intent: Intent?): IBinder {
+        return binder
+    }
+
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate() {
         super.onCreate()
-        mStartForegroundService()
-
         // MQTT 配置文件导入
         LogUtils.log(Log.DEBUG,kTag, "加载 MQTT 配置")
         loadProperties()
@@ -103,6 +120,8 @@ class MqttService : Service(), Handler.Callback  {
         }
         // 注册网络回调
         connectivityManager.registerDefaultNetworkCallback(networkCallback)
+
+        mStartForegroundService()
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -133,12 +152,14 @@ class MqttService : Service(), Handler.Callback  {
         )
 
 
-        notificationBuilder = NotificationCompat.Builder(this, channelId)
+            notificationBuilder = NotificationCompat.Builder(this, channelId)
             .setContentTitle("MQTT客户端正在运行")
             .setContentText("正在监听MQTT消息")
             .setSmallIcon(R.mipmap.logo) // 替换为你的图标
             .setContentIntent(pendingIntent)
-            .setOnlyAlertOnce(true)
+//            .setOnlyAlertOnce(true)
+            .setPriority(PRIORITY_HIGH)
+                .setOngoing(true)
 
         val notification = notificationBuilder?.build()
         startForeground(1, notification)
@@ -294,9 +315,8 @@ class MqttService : Service(), Handler.Callback  {
         return isConnected
     }
 
-
-    //mqtt订阅
     private fun subscribeToTopics(topics: Array<String>, qos: IntArray) {
+        //mqtt订阅
         try {
             mqttClient.subscribe(topics, qos, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
@@ -316,8 +336,8 @@ class MqttService : Service(), Handler.Callback  {
         }
     }
 
-    //mqtt解除订阅
     private fun unsubscribeFromTopics(topics: Array<String>) {
+        //mqtt解除订阅
         LogUtils.log(Log.DEBUG,kTag, "尝试解除订阅主题: ${topics.joinToString(", ")}")
 
         try {
@@ -336,8 +356,8 @@ class MqttService : Service(), Handler.Callback  {
         }
     }
 
-    //mqtt 发布
     fun publishMessage(topic: String, message: String, qos: Int = 1) {
+        //mqtt 发布
         try {
             val mqttMessage = MqttMessage(message.toByteArray()).apply {
                 this.qos = qos // 设置质量服务级别
@@ -347,33 +367,6 @@ class MqttService : Service(), Handler.Callback  {
         } catch (e: MqttException) {
             LogUtils.log(Log.ERROR,kTag, "消息发布失败: ${e.message}")
         }
-    }
-
-    //要和main activity进行通信
-    private var callback: MyMqttCallback? = null
-    interface MyMqttCallback {
-        fun onMqttStatusChanged(status: String)
-    }
-    fun setMyMqttCallback(cb: MyMqttCallback) {
-        this.callback = cb
-    }
-
-    //要和main activity进行绑定
-    private val binder = MqttBinder()
-    inner class MqttBinder : Binder() {
-        fun getService(): MqttService = this@MqttService
-    }
-    override fun onBind(intent: Intent?): IBinder {
-        return binder
-    }
-
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        LogUtils.log(Log.WARN,kTag, "MQTT服务被销毁，开始重新启动")
-        super.onTaskRemoved(rootIntent)
-        // 创建一个 Intent 来重新启动服务
-        val restartServiceIntent = Intent(applicationContext, MqttService::class.java)
-        restartServiceIntent.putExtra("restart", true) // 可选参数，用于传递信息
-        applicationContext.startService(restartServiceIntent) // 重新启动服务
     }
 
     override fun onDestroy() {
@@ -395,6 +388,7 @@ class MqttService : Service(), Handler.Callback  {
         } catch (e: MqttException) {
             e.printStackTrace()
         }
+        isConnected = false
         super.onDestroy()
     }
 

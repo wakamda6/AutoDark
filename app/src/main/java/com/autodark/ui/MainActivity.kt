@@ -1,6 +1,5 @@
 package com.autodark.ui
 
-import android.app.ActivityManager
 import android.content.*
 import android.os.Build
 import android.os.Bundle
@@ -42,7 +41,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
     private lateinit var mqttService: MqttService
     private var isBound = false
     private lateinit var receiver: BroadcastReceiver
-
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             val binder = service as MqttService.MqttBinder
@@ -50,38 +48,39 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
             isBound = true
             // 注册回调
             mqttService.setMyMqttCallback(this@MainActivity)
-            LogUtils.log(Log.DEBUG,kTag, "MQTT前台服务已连接")
+            LogUtils.log(Log.DEBUG,kTag, "MQTT前台服务已连接到主页")
         }
         override fun onServiceDisconnected(name: ComponentName?) {
             isBound = false
-            LogUtils.log(Log.WARN,kTag, "MQTT前台服务已断开")
+            LogUtils.log(Log.WARN,kTag, "MQTT前台服务已断开主页连接")
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+    }
 
     override fun initOnCreate(savedInstanceState: Bundle?) {
 
         // 初始化 LogUtils
         LogUtils.initialize(this)
-
-        // 测试日志输出
         LogUtils.log(Log.DEBUG, kTag, "应用启动成功")
         ActivityStackManager.addActivity(this)
 
+        //检查DingDing
         if (!isAppAvailable(Constant.DING_DING)) {
             LogUtils.log(Log.DEBUG,kTag, "DingDing 应用不可用，显示警告对话框")
             showAlertDialog()
             return
         }
 
+        //设置页面
         LogUtils.log(Log.DEBUG,kTag, "正在初始化页面")
         dingDingFragment = DingDingFragment()
         settingsFragment = SettingsFragment()
         val fragmentPages = ArrayList<Fragment>()
-
         fragmentPages.add(dingDingFragment)
         fragmentPages.add(settingsFragment)
-
         LogUtils.log(Log.DEBUG,kTag, "正在设置页面适配器")
         val fragmentAdapter =
             com.autodark.adapter.BaseFragmentAdapter(supportFragmentManager, fragmentPages)
@@ -89,8 +88,15 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
         binding.viewPager.offscreenPageLimit = fragmentPages.size
 
 
+        //mqtt服务并绑定
+        LogUtils.log(Log.INFO, kTag, "启动MQTT 服务")
+        startService(Intent(this, MqttService::class.java))
+        Intent(this, MqttService::class.java).also { intent ->
+            bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        }
 
-        // 创建并注册本地广播接收器
+
+        // 创建并注册本地广播接收器接收NotificationMonitorService的打卡结果消息
         receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 // 处理接收到的消息
@@ -102,12 +108,11 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
                     }
                 }
             }
-
         }
-
         val mqttFilter = IntentFilter("com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION")
         LocalBroadcastManager.getInstance(this).registerReceiver(receiver, mqttFilter)
 
+        //设置电源无限制
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
             if (!pm.isIgnoringBatteryOptimizations(packageName)) {
@@ -115,8 +120,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
                 startActivity(intent)
             }
         }
-
-
     }
 
     override fun initEvent() {
@@ -168,33 +171,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
         })
     }
 
-    override fun onStart() {
-        super.onStart()
-        // 检查服务是否存活，如果没有则启动
-        if (!isServiceRunning(MqttService::class.java)) {
-            LogUtils.log(Log.INFO, kTag, "MQTT 服务未运行，正在启动")
-            startService(Intent(this, MqttService::class.java))
-        } else {
-            LogUtils.log(Log.INFO, kTag, "MQTT 服务已运行")
-        }
-
-        // 绑定服务
-        Intent(this, MqttService::class.java).also { intent ->
-            bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
-        }
-    }
-
-    private fun isServiceRunning(serviceClass: Class<*>): Boolean {
-        //判断mqtt前台服务是否运行
-        val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        for (service in manager.getRunningServices(Int.MAX_VALUE)) {
-            if (serviceClass.name == service.service.className) {
-                return true
-            }
-        }
-        return false
-    }
-
     override fun onMqttStatusChanged(status: String) {
         // 显示通知或弹出消息
         runOnUiThread {
@@ -209,12 +185,11 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
         }
     }
 
-    override fun observeRequestState() {
-
-    }
-
     override fun initViewBinding(): ActivityMainBinding {
         return ActivityMainBinding.inflate(layoutInflater)
+    }
+
+    override fun observeRequestState() {
     }
 
     override fun setupTopBarLayout() {
@@ -245,15 +220,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
                 super.onKeyDown(keyCode, event)
             }
         } else super.onKeyDown(keyCode, event)
-    }
-
-    override fun onStop() {
-        super.onStop()
-        if (isBound) {
-            LogUtils.log(Log.WARN, kTag, "解绑 MQTT 服务，但保持运行")
-            unbindService(serviceConnection)
-            isBound = false
-        }
     }
 
     override fun onDestroy() {
