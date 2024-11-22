@@ -9,27 +9,40 @@ import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.Network
 import android.os.*
-import androidx.annotation.RequiresApi
-import com.autodark.extensions.openApplication
-import com.autodark.utils.Constant
-import com.autodark.utils.NetworkUtils
-import com.autodark.R
-import info.mqtt.android.service.Ack
-import info.mqtt.android.service.MqttAndroidClient
-import org.eclipse.paho.client.mqttv3.*
-import java.io.IOException
-import java.util.*
-import com.autodark.utils.LogUtils
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationCompat.PRIORITY_HIGH
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.lifecycleScope
+import com.autodark.R
+import com.autodark.extensions.createTextMail
+import com.autodark.extensions.openApplication
+import com.autodark.extensions.sendTextMail
+import com.autodark.utils.Constant
+import com.autodark.utils.LogUtils
+import com.autodark.utils.NetworkUtils
+import com.pengxh.kt.lite.extensions.show
 import com.pengxh.kt.lite.extensions.timestampToCompleteDate
+import com.pengxh.kt.lite.utils.SaveKeyValues
 import com.pengxh.kt.lite.utils.WeakReferenceHandler
+import info.mqtt.android.service.Ack
+import info.mqtt.android.service.MqttAndroidClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.eclipse.paho.client.mqttv3.*
+import java.util.*
 
-class MqttService : Service(), Handler.Callback  {
+
+class MqttService : Service(), Handler.Callback, LifecycleOwner {
     private val channelId = "MqttServiceChannel"
     private val kTag = "AuToDark.MqttService"
+
+    private val registry = LifecycleRegistry(this)
 
     //mqtt set
     private lateinit var mqttServerUrl: String
@@ -38,11 +51,9 @@ class MqttService : Service(), Handler.Callback  {
     private lateinit var pwd: String
 
     private lateinit var mqttClient: MqttAndroidClient
-    private lateinit var properties: Properties
+
 
     //mqtt配置文件导入
-    private lateinit var mqttTopicTest: String
-    private lateinit var mqttTopicTestResult: String
     private lateinit var mqttTopicCheckAppAlive: String
     private lateinit var mqttTopicCheckAppAliveResult: String
     private lateinit var mqttTopicDark: String
@@ -54,6 +65,7 @@ class MqttService : Service(), Handler.Callback  {
 
     private var isConnecting = false
     private var isConnected = false
+    private var isSendUUID = false
 
     //前台显示运行时间
     private var notificationManager: NotificationManager? = null
@@ -172,6 +184,13 @@ class MqttService : Service(), Handler.Callback  {
             updateRunnable = object : Runnable {
                 override fun run() {
                     updateNotification()
+                    if (!isMqttConnected() && !isConnecting){
+                        LogUtils.log(Log.DEBUG,kTag, "检测到mqtt断开连接，尝试连接mqtt服务器")
+                        connectToMqtt()
+                    }
+                    if(!isSendUUID){
+                        sendUUIDToEmail()
+                    }
                     weakReferenceHandler.postDelayed(this, 1000L * 60)
                 }
             }
@@ -193,26 +212,37 @@ class MqttService : Service(), Handler.Callback  {
     }
 
     private fun loadProperties() {
-        properties = Properties()
-        try {
-            assets.open("config.properties").use { inputStream ->
-                properties.load(inputStream)
-                // 将配置文件中的值赋给类属性
-                mqttServerUrl = properties.getProperty("mqttServerUrl") ?: ""
-                mqttClientId = properties.getProperty("mqttClientId") ?: ""
-                user = properties.getProperty("user") ?: ""
-                pwd = properties.getProperty("pwd") ?: ""
-                mqttTopicTest = properties.getProperty("mqttTopicTest") ?: ""
-                mqttTopicTestResult = properties.getProperty("mqttTopicTestResult") ?: ""
-                mqttTopicCheckAppAlive = properties.getProperty("mqttTopicCheckAppAlive") ?: ""
-                mqttTopicCheckAppAliveResult = properties.getProperty("mqttTopicCheckAppAliveResult") ?: ""
-                mqttTopicDark = properties.getProperty("mqttTopicDark") ?: ""
-                mqttTopicDarkResult = properties.getProperty("mqttTopicDarkResult") ?: ""
-                mqttTopicLastWill = properties.getProperty("mqttTopicLastWill") ?: ""
-            }
-        } catch (e: IOException) {
-            e.printStackTrace()
+        mqttServerUrl = "tcp://39.106.230.248:1883"
+
+        mqttClientId = getUUID()
+        LogUtils.log(Log.DEBUG,kTag, "设备唯一ID：$mqttClientId")
+
+        mqttTopicCheckAppAlive = "/topic/$mqttClientId/checkAppAlive"
+        mqttTopicCheckAppAliveResult = "/topic/$mqttClientId/checkAppAliveResult"
+        mqttTopicDark = "/topic/$mqttClientId/dark"
+        mqttTopicDarkResult = "/topic/$mqttClientId/darkResult"
+        mqttTopicLastWill = "/topic/$mqttClientId/LastWill"
+
+        user = "DDDark"
+        pwd = "456rty-="
+
+    }
+
+    fun sendUUIDToEmail() {
+        val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
+        if (emailAddress.isEmpty()) {
+            LogUtils.log(Log.DEBUG,kTag, "邮箱地址为空")
+            "邮箱地址为空".show(this)
+            return
         }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            "测试请求主题：$mqttTopicCheckAppAlive;测试回复主题:$mqttTopicCheckAppAliveResult;打卡请求主题:$mqttTopicDark;打卡回复主题:$mqttTopicDarkResult;遗嘱主题:$mqttTopicLastWill".createTextMail(
+                "控制端订阅主题通知", emailAddress
+            ).sendTextMail()
+            LogUtils.log(Log.DEBUG,kTag, "邮件发送控制端需要订阅的主题: $mqttClientId%")
+        }
+        isSendUUID = true
     }
 
     fun connectToMqtt() {
@@ -232,7 +262,6 @@ class MqttService : Service(), Handler.Callback  {
             LogUtils.log(Log.ERROR,kTag, "网络不可用，无法连接到 MQTT 代理")
             return
         }
-
 
         mqttClient = MqttAndroidClient(applicationContext, mqttServerUrl, mqttClientId, Ack.AUTO_ACK)
         val options = MqttConnectOptions().apply {
@@ -256,8 +285,8 @@ class MqttService : Service(), Handler.Callback  {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
                     LogUtils.log(Log.DEBUG,kTag, "MQTT 连接成功 代理: $mqttServerUrl")
 
-                    val topicsToSubscribe = arrayOf(mqttTopicTest, mqttTopicCheckAppAlive,mqttTopicDark)
-                    val qosLevels = intArrayOf(1,1,1) // QoS 级别
+                    val topicsToSubscribe = arrayOf(mqttTopicCheckAppAlive,mqttTopicDark)
+                    val qosLevels = intArrayOf(1,1) // QoS 级别
                     subscribeToTopics(topicsToSubscribe, qosLevels) // 连接成功后订阅主题
                     isConnecting = false
                 }
@@ -273,6 +302,7 @@ class MqttService : Service(), Handler.Callback  {
 
         mqttClient.setCallback(object : MqttCallback {
             override fun connectionLost(cause: Throwable?) {
+                LogUtils.log(Log.ERROR,kTag, "MQTT 连接已断开")
             }
 
             override fun messageArrived(topic: String?, message: MqttMessage?) {
@@ -285,13 +315,9 @@ class MqttService : Service(), Handler.Callback  {
                             LogUtils.log(Log.DEBUG,kTag, "处理主题 $mqttTopicDark 的消息，打开相关应用")
                             openApplication(Constant.DING_DING)
                         }
-                        mqttTopicTest -> {
-                            LogUtils.log(Log.DEBUG,kTag, "处理主题 $mqttTopicTest 的消息，发布测试消息")
-                            publishMessage(mqttTopicTestResult, "darkPhone_testCheck", 1)
-                        }
                         mqttTopicCheckAppAlive -> {
-                            LogUtils.log(Log.DEBUG,kTag, "处理主题 $mqttTopicCheckAppAlive 的消息，设备是否都正常连接")
-                            publishMessage(mqttTopicCheckAppAliveResult, "darkPhone_alive", 1)
+                            LogUtils.log(Log.DEBUG,kTag, "处理主题 $mqttTopicCheckAppAlive 的消息，设备是否都正常连接,并返回设备ID")
+                            publishMessage(mqttTopicCheckAppAliveResult, "$mqttClientId :alive", 1)
                         }
                         else -> {
 
@@ -382,7 +408,7 @@ class MqttService : Service(), Handler.Callback  {
             // 注销网络回调
             connectivityManager.unregisterNetworkCallback(networkCallback)
             // 取消订阅
-            unsubscribeFromTopics(arrayOf(mqttTopicTest, mqttTopicCheckAppAlive, mqttTopicDark))
+            unsubscribeFromTopics(arrayOf(mqttTopicCheckAppAlive, mqttTopicDark))
             //断开连接
             mqttClient.disconnect()
         } catch (e: MqttException) {
@@ -395,4 +421,37 @@ class MqttService : Service(), Handler.Callback  {
     override fun handleMessage(msg: Message): Boolean {
         return true
     }
+
+    //获取设备唯一ID
+    private fun getUUID(): String {
+        var mSerial: String?
+        val mDevIDShort = "随机两位数" +
+                (Build.BOARD.length % 10) + (Build.BRAND.length % 10) +
+                (Build.CPU_ABI.length % 10) + (Build.DEVICE.length % 10) +
+                (Build.DISPLAY.length % 10) + (Build.HOST.length % 10) +
+                (Build.ID.length % 10) + (Build.MANUFACTURER.length % 10) +
+                (Build.MODEL.length % 10) + (Build.PRODUCT.length % 10) +
+                (Build.TAGS.length % 10) + (Build.TYPE.length % 10) +
+                (Build.USER.length % 10) //13 位
+
+        try {
+            mSerial = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                android.os.Build.getSerial()
+            } else {
+                Build.SERIAL
+            }
+            // API >= 9 使用 serial 号
+            return UUID(mDevIDShort.hashCode().toLong(), mSerial.hashCode().toLong()).toString()
+        } catch (exception: Exception) {
+            // serial 需要一个初始化
+            mSerial = "默认值" // 随便一个初始化
+        }
+        // 使用硬件信息拼凑出来的 15 位号码
+        return UUID(mDevIDShort.hashCode().toLong(), mSerial.hashCode().toLong()).toString()
+    }
+
+    override fun getLifecycle(): Lifecycle {
+        return registry
+    }
+
 }
