@@ -55,9 +55,10 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
     }
 
     // 调用发送消息的方法
-    fun pushMqttMessage(topic: String, message: String,qoS: Int) {
+    fun pushMqttDarkResult(message: String,qoS: Int) {
+        // 调用发送消息的方法
         if (isBound) {
-            mqttService.publishMessage(topic, message,qoS)
+            mqttService.publishMqttDarkResult(message,qoS)
         }
     }
 
@@ -116,7 +117,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>(), MqttService.MyMq
                 if (intent?.action == "com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION") {
                     LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "收到通知：$message")
                     if (message != null) {
-                        pushMqttMessage("/topic/darkResult", message,1)
+                        pushMqttDarkResult(message,1)
                     }
                 }
             }

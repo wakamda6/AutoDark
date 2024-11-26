@@ -343,6 +343,19 @@ class MqttService : Service() {
         }
     }
 
+    fun publishMqttDarkResult(message: String, qos: Int = 1) {
+        //mqtt 发布
+        try {
+            val mqttMessage = MqttMessage(message.toByteArray()).apply {
+                this.qos = qos // 设置质量服务级别
+            }
+            mqttClient.publish(mqttTopicDarkResult, mqttMessage, null, null)
+            LogUtils.log(Log.DEBUG,"AuToDark.publishMqttDarkResult","消息发布成功: $mqttTopicDarkResult:$message")
+        } catch (e: MqttException) {
+            LogUtils.log(Log.ERROR,"AuToDark.publishMqttDarkResult","消息发布失败: ${e.message}")
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         try {

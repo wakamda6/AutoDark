@@ -12,7 +12,7 @@ android {
         minSdkVersion 23
         targetSdkVersion 33
         versionCode 1530
-        versionName "1.5.4"
+        versionName "1.5.5"
         flavorDimensions "versionCode"
     }
 
