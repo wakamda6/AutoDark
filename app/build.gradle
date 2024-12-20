@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId "com.autodark"
-        minSdkVersion 23
+        minSdkVersion 24
         targetSdkVersion 33
         versionCode 1530
         versionName "1.5.5"

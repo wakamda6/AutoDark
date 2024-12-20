@@ -1,201 +1,203 @@
 package com.autodark.service
 
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
+import android.content.BroadcastReceiver
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.Network
 import android.os.*
-import androidx.annotation.RequiresApi
 import com.autodark.extensions.openApplication
-import com.autodark.ui.MainActivity
 import com.autodark.utils.Constant
 import com.autodark.utils.NetworkUtils
-import com.pengxh.kt.lite.extensions.timestampToTime
 import info.mqtt.android.service.Ack
 import info.mqtt.android.service.MqttAndroidClient
 import org.eclipse.paho.client.mqttv3.*
-import java.io.IOException
-import java.util.*
 import com.autodark.utils.LogUtils
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.autodark.R
 import com.pengxh.kt.lite.extensions.timestampToCompleteDate
-import com.pengxh.kt.lite.extensions.timestampToDate
+import com.pengxh.kt.lite.utils.WeakReferenceHandler
+import java.io.PrintWriter
+import java.io.StringWriter
+import android.content.Context
+import android.provider.Settings
 
-class MqttService : Service() {
 
-    //要和main activity进行绑定
-    private val binder = MqttBinder()
-    private var callback: MyMqttCallback? = null
+/**
+ * mqtt前台服务
+ * */
+class MqttService : Service(), Handler.Callback {
 
-    interface MyMqttCallback {
-        fun onMqttStatusChanged(status: String)
+    private val kTag = "MqttService"
+    private val notificationId = 1
+    private val weakReferenceHandler by lazy { WeakReferenceHandler(this) }
+    private var notificationManager: NotificationManager? = null
+    private var notificationBuilder: NotificationCompat.Builder? = null
+    private var runningTime = 0L
+    private lateinit var updateRunnable: Runnable
+
+    override fun handleMessage(msg: Message): Boolean {
+        return true
     }
 
-    fun setMyMqttCallback(cb: MyMqttCallback) {
-        this.callback = cb
-    }
-
-    inner class MqttBinder : Binder() {
-        fun getService(): MqttService = this@MqttService
-    }
-
-    override fun onBind(intent: Intent?): IBinder {
-        return binder
-    }
-
-    override fun onTaskRemoved(rootIntent: Intent?) {
-        super.onTaskRemoved(rootIntent)
-
-        // 创建一个 Intent 来重新启动服务
-        val restartServiceIntent = Intent(applicationContext, this::class.java)
-        restartServiceIntent.putExtra("restart", true) // 可选参数，用于传递信息
-        applicationContext.startService(restartServiceIntent) // 重新启动服务
-    }
-
-    private val channelId = "MqttServiceChannel"
-
-    //mqtt set
+    //mqtt设置
     private lateinit var mqttServerUrl: String
     private lateinit var mqttClientId: String
     private lateinit var user: String
     private lateinit var pwd: String
-
     private lateinit var mqttClient: MqttAndroidClient
-    private lateinit var properties: Properties
-
-    //mqtt配置文件导入
-    private lateinit var mqttTopicTest: String
-    private lateinit var mqttTopicTestResult: String
     private lateinit var mqttTopicCheckAppAlive: String
     private lateinit var mqttTopicCheckAppAliveResult: String
     private lateinit var mqttTopicDark: String
     private lateinit var mqttTopicDarkResult: String
     private lateinit var mqttTopicLastWill: String
 
+    //网络相关
     private lateinit var connectivityManager: ConnectivityManager
     private lateinit var networkCallback: ConnectivityManager.NetworkCallback
-
     var isConnecting = false
 
-    @RequiresApi(Build.VERSION_CODES.O)
+    //广播器设置
+    private lateinit var receiver: BroadcastReceiver
+    private val mqttTopicAction = "com.example.MQTT_PUBLISH_DARK_TOPIC"
+    val mqttPushAction = "com.example.MQTT_PUBLISH_DARK_RESULT"
+
+
     override fun onCreate() {
-        super.onCreate()
-        startForegroundService()
+        notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        // Android 8.0（API 级别 26）及以上版本需要创建通知渠道
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "${resources.getString(R.string.app_name)}前台服务"
+            val channel = NotificationChannel(
+                "foreground_running_service_channel", name, NotificationManager.IMPORTANCE_HIGH
+            )
+            channel.description = "Channel for Foreground Running Service"
+            notificationManager?.createNotificationChannel(channel)
+        }
+        notificationBuilder = NotificationCompat.Builder(this, "foreground_running_service_channel")
+            .setSmallIcon(R.mipmap.logo)
+            .setContentTitle("已运行0小时0分钟")
+            .setContentText(Constant.FOREGROUND_RUNNING_SERVICE_TITLE)
+            .setPriority(NotificationCompat.PRIORITY_HIGH) // 设置通知优先级setContentText
+            .setOngoing(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+
+        val notification = notificationBuilder?.build()
+        startForeground(notificationId, notification)
 
         // MQTT 配置文件导入
-        LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "加载 MQTT 配置")
         loadProperties()
+        LogUtils.log(Log.DEBUG,kTag, "加载 MQTT 配置文件")
 
-        // 初始化 ConnectivityManager 和 NetworkCallback
+        // 创建并注册本地广播接收器
+        receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                // 处理接收到的消息
+                val message = intent?.getStringExtra("message")
+                if (intent?.action == mqttPushAction) {
+                    LogUtils.log(Log.DEBUG,kTag, "收到Main activity的发送打卡结果通知：$message")
+                    if (message != null) {
+                        publishMqttDarkResult(message,1)
+                    }
+                }
+            }
+        }
+        val mqttFilter = IntentFilter(mqttPushAction)
+        LocalBroadcastManager.getInstance(this).registerReceiver(receiver, mqttFilter)
+
+        // 初始化网络相关配置
         connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onReceive", "网络连接可用")
+                LogUtils.log(Log.DEBUG,kTag, "网络连接可用")
 
                 // 检查 MQTT 客户端是否已连接
                 if (!isMqttConnected() && !isConnecting){
-                    LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onReceive", "MQTT 尚未连接，尝试连接")
+                    LogUtils.log(Log.DEBUG,kTag, "MQTT连接中")
                     connectToMqtt()
                 }else{
-                    LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onReceive", "MQTT 已连接")
+                    LogUtils.log(Log.DEBUG,kTag, "MQTT 已连接")
                 }
             }
 
             override fun onLost(network: Network) {
                 // 网络丢失时可以选择执行其他操作
-                LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onLost", "网络丢失,正在取消连接")
+                LogUtils.log(Log.WARN,kTag, "网络丢失,正在取消连接")
                 if (!isMqttConnected()) {
                     mqttClient.disconnect()
-                    LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onLost", "MQTT 连接已断开")
+                    LogUtils.log(Log.WARN,kTag, "MQTT 连接已断开")
                 }
             }
         }
         // 注册网络回调
         connectivityManager.registerDefaultNetworkCallback(networkCallback)
 
-        //连接
-        if (!isMqttConnected() && !isConnecting){
-            LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onReceive", "MQTT 尚未连接，尝试连接")
-            connectToMqtt()
-        }else{
-            LogUtils.log(Log.DEBUG,"AuToDark.NetworkChangeReceiver.onReceive", "MQTT 已连接")
-        }
+        //发送需要订阅的主题
+
+        val message = "测试请求主题：$mqttTopicCheckAppAlive\n" +
+                "测试回复主题:$mqttTopicCheckAppAliveResult\n" +
+                "打卡请求主题:$mqttTopicDark\n" +
+                "打卡回复主题:$mqttTopicDarkResult\n" +
+                "遗嘱主题:$mqttTopicLastWill\n"
+        sendBroadcast(message)
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
-    private fun startForegroundService() {
-        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "MQTT Service Channel",
-                NotificationManager.IMPORTANCE_HIGH
-            )
-            notificationManager.createNotificationChannel(channel)
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        //记录通知被创建的时间
+        runningTime = System.currentTimeMillis()
+        updateRunnable = object : Runnable {
+            override fun run() {
+                updateNotification()
+                weakReferenceHandler.postDelayed(this, 1000L * 60)
+            }
         }
+        weakReferenceHandler.post(updateRunnable)
+        return START_STICKY
+    }
 
-        val notificationIntent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            notificationIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+    private fun updateNotification() {
+        // 计算运行时长
+        val elapsedTime = System.currentTimeMillis() - runningTime
+        val hours = (elapsedTime / (1000 * 60 * 60)).toInt()
+        val minutes = (elapsedTime % (1000 * 60 * 60) / (1000 * 60)).toInt()
 
-
-        val notification: Notification = Notification.Builder(this, channelId)
-            .setContentTitle("MQTT客户端正在运行")
-            .setContentText("正在监听MQTT消息")
-            .setSmallIcon(android.R.drawable.ic_menu_add) // 替换为你的图标
-            .setContentIntent(pendingIntent)
-            .build()
-
-        startForeground(1, notification)
+        notificationBuilder?.setContentTitle("已运行${hours}小时${minutes}分钟")
+        val notification = notificationBuilder?.build()
+        notificationManager?.notify(notificationId, notification)
     }
 
     private fun loadProperties() {
-        properties = Properties()
-        try {
-            assets.open("config.properties").use { inputStream ->
-                properties.load(inputStream)
-                // 将配置文件中的值赋给类属性
-                mqttServerUrl = properties.getProperty("mqttServerUrl") ?: ""
-                mqttClientId = properties.getProperty("mqttClientId") ?: ""
-                user = properties.getProperty("user") ?: ""
-                pwd = properties.getProperty("pwd") ?: ""
-                mqttTopicTest = properties.getProperty("mqttTopicTest") ?: ""
-                mqttTopicTestResult = properties.getProperty("mqttTopicTestResult") ?: ""
-                mqttTopicCheckAppAlive = properties.getProperty("mqttTopicCheckAppAlive") ?: ""
-                mqttTopicCheckAppAliveResult = properties.getProperty("mqttTopicCheckAppAliveResult") ?: ""
-                mqttTopicDark = properties.getProperty("mqttTopicDark") ?: ""
-                mqttTopicDarkResult = properties.getProperty("mqttTopicDarkResult") ?: ""
-                mqttTopicLastWill = properties.getProperty("mqttTopicLastWill") ?: ""
-            }
-        } catch (e: IOException) {
-            e.printStackTrace()
-        }
+        mqttServerUrl = "tcp://39.106.230.248:1883"
+        mqttClientId = getUUID()
+        LogUtils.log(Log.DEBUG,kTag, "设备唯一ID：$mqttClientId")
+        mqttTopicCheckAppAlive = "/topic/$mqttClientId/checkAppAlive"
+        mqttTopicCheckAppAliveResult = "/topic/$mqttClientId/checkAppAliveResult"
+        mqttTopicDark = "/topic/$mqttClientId/dark"
+        mqttTopicDarkResult = "/topic/$mqttClientId/darkResult"
+        mqttTopicLastWill = "/topic/$mqttClientId/LastWill"
+        user = mqttClientId
+        pwd = mqttClientId
     }
 
     fun connectToMqtt() {
-        LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "尝试连接到 MQTT 代理")
+        LogUtils.log(Log.DEBUG,kTag, "尝试连接到 MQTT 代理")
 
         if (isMqttConnected() || isConnecting) {
-            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "已经连接或正在连接中，取消连接请求")
+            LogUtils.log(Log.WARN,kTag, "已经连接或正在连接中，取消连接请求")
             return
         }
 
         isConnecting = true
-        LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "设置连接状态为正在连接")
 
         // 确保网络连接
         if (!NetworkUtils.isNetworkAvailable(this)) {
-            Log.e("AuToDark.connectToMqtt", "网络不可用，无法连接到 MQTT 代理")
+            LogUtils.log(Log.WARN,kTag, "网络不可用，无法连接到 MQTT 代理")
+            isConnecting = false
             return
         }
 
@@ -218,46 +220,51 @@ class MqttService : Service() {
         }
 
         try {
-            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "连接到 MQTT 代理: $mqttServerUrl")
             mqttClient.connect(options, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
-                    LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "MQTT 连接成功")
+                    LogUtils.log(Log.DEBUG,kTag, "$mqttServerUrl 连接成功")
                     isConnecting = false
 
-                    val topicsToSubscribe = arrayOf(mqttTopicTest, mqttTopicCheckAppAlive,mqttTopicDark)
-                    val qosLevels = intArrayOf(1,1,1) // QoS 级别
+                    val topicsToSubscribe = arrayOf(mqttTopicCheckAppAlive,mqttTopicDark)
+                    val qosLevels = intArrayOf(1,1) // QoS 级别
                     subscribeToTopics(topicsToSubscribe, qosLevels) // 连接成功后订阅主题
                 }
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
-                    Log.e("AuToDark.connectToMqtt", "MQTT 通信失败: ${exception?.message}")
+                    LogUtils.log(Log.ERROR,kTag, "MQTT 通信失败: ${exception?.message}")
                     isConnecting = false
                 }
             })
         } catch (e: MqttException) {
-            Log.e("AuToDark.connectToMqtt", "MQTT 连接异常: ${e.message}")
+            LogUtils.log(Log.ERROR,kTag, "MQTT 连接异常: ${e.message}")
+            isConnecting = false
         }
 
         mqttClient.setCallback(object : MqttCallback {
             override fun connectionLost(cause: Throwable?) {
+                if (cause != null) {
+                    LogUtils.log(Log.ERROR, kTag, "MQTT 连接断开：${cause.message}")
+                    val stackTrace = StringWriter().also { writer ->
+                        cause.printStackTrace(PrintWriter(writer))
+                    }.toString()
+                    LogUtils.log(Log.ERROR, kTag, "堆栈信息：\n$stackTrace")
+                } else {
+                    LogUtils.log(Log.ERROR, kTag, "MQTT 连接断开，原因未知")
+                }
             }
 
             override fun messageArrived(topic: String?, message: MqttMessage?) {
                 message?.let {
                     val msg = String(it.payload) // 将消息体转换为字符串
-                    LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "收到主题 $topic 的消息: $msg")
+                    LogUtils.log(Log.DEBUG,kTag, "收到主题 $topic 的消息: $msg")
 
                     when (topic) {
                         mqttTopicDark -> {
-                            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "处理主题 $mqttTopicDark 的消息，打开相关应用")
+                            LogUtils.log(Log.DEBUG,kTag, "处理主题 $mqttTopicDark 的消息，打开相关应用")
                             openApplication(Constant.DING_DING)
                         }
-                        mqttTopicTest -> {
-                            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "处理主题 $mqttTopicTest 的消息，发布测试消息")
-                            publishMessage(mqttTopicTestResult, "darkPhone_testCheck", 1)
-                        }
                         mqttTopicCheckAppAlive -> {
-                            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "处理主题 $mqttTopicCheckAppAlive 的消息，设备是否都正常连接")
+                            LogUtils.log(Log.DEBUG,kTag, "处理主题 $mqttTopicCheckAppAlive 的消息，设备是否都正常连接")
                             publishMessage(mqttTopicCheckAppAliveResult, "darkPhone_alive", 1)
                         }
                         else -> {
@@ -268,48 +275,46 @@ class MqttService : Service() {
             }
 
             override fun deliveryComplete(token: IMqttDeliveryToken?) {
-
+                LogUtils.log(Log.DEBUG,kTag, "消息发送成功：${token?.message?.toString()}")
             }
         })
     }
 
     fun isMqttConnected(): Boolean {
-        LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "检查 MQTT 连接状态")
-
-        return try {
-            val isConnected = ::mqttClient.isInitialized && mqttClient.isConnected
-            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "MQTT 连接状态: $isConnected")
+        return if (::mqttClient.isInitialized) {
+            val isConnected = mqttClient.isConnected
+            LogUtils.log(Log.DEBUG, kTag, "MQTT状态已连接")
             isConnected
-        } catch (e: UninitializedPropertyAccessException) {
-            Log.e("AuToDark.connectToMqtt", "MQTT 客户端未初始化，连接状态为 false")
+        } else {
             false
         }
     }
+
 
     //mqtt订阅
     private fun subscribeToTopics(topics: Array<String>, qos: IntArray) {
         try {
             mqttClient.subscribe(topics, qos, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
-                    LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "成功订阅主题: ${topics.joinToString(", ")}")
-                    callback?.onMqttStatusChanged("成功订阅主题: ${topics.joinToString(", ")}")
+                    LogUtils.log(Log.DEBUG, kTag,"成功订阅主题: ${topics.joinToString(", ")}")
                 }
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
-                    Log.e("AuToDark.connectToMqtt", "订阅失败: ${exception?.message}")
-                    callback?.onMqttStatusChanged("订阅失败: ${exception?.message}")
+                    LogUtils.log(Log.ERROR, kTag,"订阅失败: ${exception?.message}")
                 }
             })
         } catch (e: MqttException) {
-            Log.e("AuToDark.connectToMqtt", "订阅异常: ${e.message}")
-            e.printStackTrace()
-            callback?.onMqttStatusChanged("订阅异常: ${e.message}")
+            LogUtils.log(Log.ERROR, kTag,"订阅异常: ${e.message}")
+            val stackTrace = StringWriter().also { writer ->
+                e.printStackTrace(PrintWriter(writer))
+            }.toString()
+            LogUtils.log(Log.ERROR, kTag, "堆栈信息：\n$stackTrace")
         }
     }
 
     //mqtt解除订阅
     private fun unsubscribeFromTopics(topics: Array<String>) {
-        LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "尝试解除订阅主题: ${topics.joinToString(", ")}")
+        LogUtils.log(Log.DEBUG,kTag, "尝试解除订阅主题: ${topics.joinToString(", ")}")
 
         try {
             mqttClient.unsubscribe(topics, null, object : IMqttActionListener {
@@ -318,55 +323,66 @@ class MqttService : Service() {
                 }
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
-                    Log.e("AuToDark.connectToMqtt", "解除订阅失败: ${exception?.message}")
+                    LogUtils.log(Log.ERROR,kTag,  "解除订阅失败: ${exception?.message}")
                 }
             })
         } catch (e: MqttException) {
-            Log.e("AuToDark.connectToMqtt", "解除订阅异常: ${e.message}")
-            e.printStackTrace()
+            LogUtils.log(Log.ERROR,kTag,  "解除订阅异常: ${e.message}")
+            val stackTrace = StringWriter().also { writer ->
+                e.printStackTrace(PrintWriter(writer))
+            }.toString()
+            LogUtils.log(Log.ERROR, kTag, "堆栈信息：\n$stackTrace")
         }
     }
 
 
     //mqtt 发布
     fun publishMessage(topic: String, message: String, qos: Int = 1) {
-        LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "尝试发布消息到主题 $topic: $message")
+        LogUtils.log(Log.DEBUG,kTag, "尝试发布消息到主题 $topic: $message")
 
         try {
             val mqttMessage = MqttMessage(message.toByteArray()).apply {
                 this.qos = qos // 设置质量服务级别
             }
             mqttClient.publish(topic, mqttMessage, null, null)
-            LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "消息发布成功: $message")
         } catch (e: MqttException) {
-            Log.e("AuToDark.connectToMqtt", "消息发布失败: ${e.message}")
+            LogUtils.log(Log.ERROR,kTag, "消息发布失败: ${e.message}")
         }
     }
 
     fun publishMqttDarkResult(message: String, qos: Int = 1) {
-        //mqtt 发布
-        try {
-            val mqttMessage = MqttMessage(message.toByteArray()).apply {
-                this.qos = qos // 设置质量服务级别
-            }
-            mqttClient.publish(mqttTopicDarkResult, mqttMessage, null, null)
-            LogUtils.log(Log.DEBUG,"AuToDark.publishMqttDarkResult","消息发布成功: $mqttTopicDarkResult:$message")
-        } catch (e: MqttException) {
-            LogUtils.log(Log.ERROR,"AuToDark.publishMqttDarkResult","消息发布失败: ${e.message}")
-        }
+        publishMessage(mqttTopicDarkResult,message,qos)
+    }
+
+    //获取设备唯一ID
+    private fun getUUID(): String {
+        return Settings.Secure.getString(this.contentResolver, Settings.Secure.ANDROID_ID)
+    }
+
+    private fun sendBroadcast(message: String) {
+        LogUtils.log(Log.DEBUG,kTag, "发送本机mqtt主题到Main activity:$message")
+        val intent = Intent(mqttTopicAction)
+        intent.putExtra("message", message)
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent) // 发送本地广播
     }
 
     override fun onDestroy() {
         super.onDestroy()
         try {
-            // 注销网络回调
-            connectivityManager.unregisterNetworkCallback(networkCallback)
             // 取消订阅
-            unsubscribeFromTopics(arrayOf(mqttTopicTest, mqttTopicCheckAppAlive, mqttTopicDark))
+            unsubscribeFromTopics(arrayOf(mqttTopicCheckAppAlive, mqttTopicDark))
             //断开连接
             mqttClient.disconnect()
+            // 注销网络回调
+            connectivityManager.unregisterNetworkCallback(networkCallback)
+            weakReferenceHandler.removeCallbacksAndMessages(null)
+            stopForeground(STOP_FOREGROUND_REMOVE)
         } catch (e: MqttException) {
             e.printStackTrace()
         }
+    }
+
+    override fun onBind(intent: Intent?): IBinder? {
+        return null
     }
 }

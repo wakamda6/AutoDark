@@ -2,10 +2,7 @@ package com.autodark.service
 
 import com.autodark.utils.LogUtils
 import android.app.Notification
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.os.BatteryManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -34,40 +31,15 @@ import java.util.UUID
 
     class NotificationMonitorService : NotificationListenerService(), LifecycleOwner {
 
-    private val kTag = "AuToDark.MonitorService"
+    private val kTag = "NotificationMonitorService"
     private val registry = LifecycleRegistry(this)
 
-    private lateinit var receiver: BroadcastReceiver
-    override fun onCreate() {
-        super.onCreate()
-
-        // 创建广播接收器
-        receiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                // 处理广播
-                val message = intent?.getStringExtra("message")
-                LogUtils.log(Log.DEBUG,"NotificationMonitorService", "Received message: $message")
-            }
-        }
-
-        // 注册本地广播接收器
-        val filter = IntentFilter("com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION")
-        LocalBroadcastManager.getInstance(this).registerReceiver(receiver, filter)
+    private fun sendBroadcast(message: String) {
+        LogUtils.log(Log.DEBUG,kTag, "发送打卡结果到Main activity:$message")
+        val intent = Intent("com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION")
+        intent.putExtra("message", message)
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent) // 发送本地广播
     }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        // 注销本地广播接收器
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver)
-    }
-
-    private fun sendMessageToMainActivity(message: String) {
-        val mIntent = Intent("com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION")
-        mIntent.putExtra("message", message)
-        LocalBroadcastManager.getInstance(this).sendBroadcast(mIntent) // 发送本地广播
-    }
-
-
 
     override fun getLifecycle(): Lifecycle {
         return registry
@@ -129,7 +101,6 @@ import java.util.UUID
         }
 
         notificationBeanDao.save(notificationBean)
-        LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 保存通知信息至数据库")
 
         val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
         if (emailAddress.isEmpty()) {
@@ -157,7 +128,7 @@ import java.util.UUID
 
                 //通过mqtt发送通知内容
                 val notification = "dark_success:$title: $notice"
-                sendMessageToMainActivity(notification)
+                sendBroadcast(notification)
 
             }
         } else if (packageName in listOf(Constant.WECHAT, Constant.QQ, Constant.TIM, Constant.ZFB)) {
