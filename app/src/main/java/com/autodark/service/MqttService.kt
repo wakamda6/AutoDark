@@ -120,18 +120,11 @@ class MqttService : Service(), Handler.Callback {
                 if (!isMqttConnected() && !isConnecting){
                     LogUtils.log(Log.DEBUG,kTag, "MQTT连接中")
                     connectToMqtt()
-                }else{
-                    LogUtils.log(Log.DEBUG,kTag, "MQTT 已连接")
                 }
             }
 
             override fun onLost(network: Network) {
                 // 网络丢失时可以选择执行其他操作
-                LogUtils.log(Log.WARN,kTag, "网络丢失,正在取消连接")
-                if (!isMqttConnected()) {
-                    mqttClient.disconnect()
-                    LogUtils.log(Log.WARN,kTag, "MQTT 连接已断开")
-                }
             }
         }
         // 注册网络回调
@@ -206,18 +199,19 @@ class MqttService : Service(), Handler.Callback {
         val options = MqttConnectOptions().apply {
             isCleanSession = true
             connectionTimeout = 10
-            keepAliveInterval = 10
+            keepAliveInterval = 30
             userName = user
             password = pwd.toCharArray()
 
             // 设置遗嘱消息
-            val willQoS = 1 // 设置 QoS 为 1
+            val willQoS = 2
 
             // 获取当前时间戳
             val willMessage = "darkPhone_offline_at_" + System.currentTimeMillis().timestampToCompleteDate()
 
             setWill(mqttTopicLastWill, willMessage.toByteArray(), willQoS, true)
         }
+        options.isAutomaticReconnect = true
 
         try {
             mqttClient.connect(options, null, object : IMqttActionListener {
@@ -240,7 +234,7 @@ class MqttService : Service(), Handler.Callback {
             isConnecting = false
         }
 
-        mqttClient.setCallback(object : MqttCallback {
+        mqttClient.setCallback(object : MqttCallbackExtended {
             override fun connectionLost(cause: Throwable?) {
                 if (cause != null) {
                     LogUtils.log(Log.ERROR, kTag, "MQTT 连接断开：${cause.message}")
@@ -251,6 +245,20 @@ class MqttService : Service(), Handler.Callback {
                 } else {
                     LogUtils.log(Log.ERROR, kTag, "MQTT 连接断开，原因未知")
                 }
+                isConnecting = true
+            }
+
+            override fun connectComplete(reconnect: Boolean, serverURI: String?) {
+                if (reconnect) {
+                    LogUtils.log(Log.INFO, kTag, "重连成功")
+                } else {
+                    LogUtils.log(Log.INFO, kTag, "初次连接成功")
+                }
+                isConnecting = false
+
+                val topicsToSubscribe = arrayOf(mqttTopicCheckAppAlive,mqttTopicDark)
+                val qosLevels = intArrayOf(1,1) // QoS 级别
+                subscribeToTopics(topicsToSubscribe, qosLevels) // 连接成功后订阅主题
             }
 
             override fun messageArrived(topic: String?, message: MqttMessage?) {

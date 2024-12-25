@@ -284,17 +284,13 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
 
 
     override fun handleMessage(msg: Message): Boolean {
-        LogUtils.log(Log.DEBUG,kTag, "handleMessage 被调用，what: ${msg.what}")
-
         when (msg.what) {
             2024090801 -> {
-                LogUtils.log(Log.DEBUG,kTag, " 通知监听服务运行中")
                 "通知监听服务运行中".show(requireContext())
                 binding.noticeSwitch.isChecked = true
                 binding.tipsView.visibility = View.GONE
             }
             2024090802 -> {
-                LogUtils.log(Log.DEBUG,kTag, " 通知监听服务已关闭")
                 "通知监听服务已关闭".show(requireContext())
                 binding.noticeSwitch.isChecked = false
                 binding.tipsView.visibility = View.VISIBLE
