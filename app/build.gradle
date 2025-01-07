@@ -12,7 +12,7 @@ android {
         minSdkVersion 24
         targetSdkVersion 33
         versionCode 1530
-        versionName "1.5.9.1"
+        versionName "2.0.0.0"
         flavorDimensions "versionCode"
     }
 
@@ -35,10 +35,10 @@ android {
     def id = "com.${createRandomCode()}.${createRandomCode()}"
     productFlavors {
         auto {
-            //debug
-            applicationId "com.autodark"
+//            debug
+//            applicationId "com.autodark"
 
-//            applicationId = id
+            applicationId = id
         }
     }
     packagingOptions {
