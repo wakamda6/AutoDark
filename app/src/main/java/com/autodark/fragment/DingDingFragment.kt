@@ -27,7 +27,7 @@ import com.autodark.bean.DateTimeBean
 
 class DingDingFragment : KotlinBaseFragment<FragmentDingdingBinding>() {
 
-    private val kTag = "AuToDark.DingDingFragment"
+    private val kTag = "DingDingFragment"
     private val dateTimeBeanDao by lazy { BaseApplication.get().daoSession.dateTimeBeanDao }
     private val marginOffset by lazy { 10.dp2px(requireContext()) }
     private lateinit var dateTimeAdapter: DateTimeAdapter

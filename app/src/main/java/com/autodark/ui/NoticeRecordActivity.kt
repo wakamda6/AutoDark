@@ -18,8 +18,11 @@ import com.pengxh.kt.lite.divider.RecyclerViewItemDivider
 import com.pengxh.kt.lite.utils.ActivityStackManager
 import com.pengxh.kt.lite.utils.WeakReferenceHandler
 import com.pengxh.kt.lite.widget.TitleBarView
+import com.pengxh.kt.lite.widget.dialog.AlertMessageDialog
 
 class NoticeRecordActivity : KotlinBaseActivity<ActivityNoticeBinding>(), Handler.Callback {
+
+    private val kTag = "NoticeRecordActivity"
 
     private val notificationBeanDao by lazy { com.autodark.BaseApplication.get().daoSession.notificationBeanDao }
     private lateinit var weakReferenceHandler: WeakReferenceHandler
@@ -34,83 +37,94 @@ class NoticeRecordActivity : KotlinBaseActivity<ActivityNoticeBinding>(), Handle
     }
 
     override fun setupTopBarLayout() {
-        LogUtils.log(Log.DEBUG,"AuToDark.setupTopBarLayout", "设置顶部导航栏布局")
 
         // 初始化沉浸式状态栏
         binding.rootView.initImmersionBar(this, true, R.color.white)
-        LogUtils.log(Log.DEBUG,"AuToDark.setupTopBarLayout", "沉浸式状态栏已初始化，背景颜色设置为白色")
+        LogUtils.log(Log.DEBUG,kTag, "沉浸式状态栏已初始化，背景颜色设置为白色")
 
         // 设置标题栏点击事件
         binding.titleView.setOnClickListener(object : TitleBarView.OnClickListener {
             override fun onLeftClick() {
-                LogUtils.log(Log.DEBUG,"AuToDark.setupTopBarLayout", "左侧按钮点击，结束当前活动")
+                LogUtils.log(Log.DEBUG,kTag, "左侧按钮点击，结束当前活动")
                 finish()
             }
 
             override fun onRightClick() {
-                LogUtils.log(Log.DEBUG,"AuToDark.setupTopBarLayout", "右侧按钮点击，执行相应操作")
-                // 此处可以添加右侧按钮的操作
+                LogUtils.log(Log.DEBUG,kTag, "右侧按钮点击，执行相应操作")
+                AlertMessageDialog.Builder()
+                    .setContext(this@NoticeRecordActivity)
+                    .setTitle("温馨提示")
+                    .setMessage("此操作将会清空所有通知记录，且不可恢复")
+                    .setPositiveButton("知道了")
+                    .setOnDialogButtonClickListener(object :
+                        AlertMessageDialog.OnDialogButtonClickListener {
+                        override fun onConfirmClick() {
+                            notificationBeanDao.deleteAll()
+                            binding.emptyView.visibility = View.VISIBLE
+                            binding.notificationView.visibility = View.GONE
+                        }
+                    }).build().show()
             }
         })
     }
 
 
     override fun initOnCreate(savedInstanceState: Bundle?) {
-        LogUtils.log(Log.DEBUG,"AuToDark.initOnCreate", "初始化活动")
+        LogUtils.log(Log.DEBUG,kTag, "初始化活动")
 
         ActivityStackManager.addActivity(this)
 
         weakReferenceHandler = WeakReferenceHandler(this)
-        LogUtils.log(Log.DEBUG,"AuToDark.initOnCreate", "创建 WeakReferenceHandler")
+        LogUtils.log(Log.DEBUG,kTag, "创建 WeakReferenceHandler")
 
         dataBeans = queryNotificationRecord()
-        LogUtils.log(Log.DEBUG,"AuToDark.initOnCreate", "查询通知记录，数量: ${dataBeans.size}")
+        LogUtils.log(Log.DEBUG,kTag, "查询通知记录，数量: ${dataBeans.size}")
 
         weakReferenceHandler.sendEmptyMessage(2022061901)
-        LogUtils.log(Log.DEBUG,"AuToDark.initOnCreate", "发送消息以更新 UI")
+        LogUtils.log(Log.DEBUG,kTag, "发送消息以更新 UI")
     }
 
 
     override fun initEvent() {
-        LogUtils.log(Log.DEBUG,"AuToDark.initEvent", "初始化事件监听")
+        LogUtils.log(Log.DEBUG,kTag, "初始化事件监听")
 
         binding.refreshLayout.setOnRefreshListener { refreshLayout ->
-            LogUtils.log(Log.DEBUG,"AuToDark.initEvent", "开始刷新数据")
+            LogUtils.log(Log.DEBUG,kTag, "开始刷新数据")
             isRefresh = true
             object : CountDownTimer(1000, 500) {
                 override fun onTick(millisUntilFinished: Long) {
-                    LogUtils.log(Log.DEBUG,"AuToDark.initEvent", "刷新中... 剩余时间: $millisUntilFinished")
+                    LogUtils.log(Log.DEBUG,kTag, "刷新中... 剩余时间: $millisUntilFinished")
                 }
 
                 override fun onFinish() {
-                    LogUtils.log(Log.DEBUG,"AuToDark.initEvent", "刷新完成")
+                    LogUtils.log(Log.DEBUG,kTag, "刷新完成")
                     isRefresh = false
                     dataBeans.clear()
                     offset = 0
                     dataBeans = queryNotificationRecord()
                     refreshLayout.finishRefresh()
                     weakReferenceHandler.sendEmptyMessage(2022061901)
-                    LogUtils.log(Log.DEBUG,"AuToDark.initEvent", "数据更新完成，更新 UI")
+                    LogUtils.log(Log.DEBUG,kTag, "数据更新完成，更新 UI")
                 }
             }.start()
         }
 
         binding.refreshLayout.setOnLoadMoreListener { refreshLayout ->
-            LogUtils.log(Log.DEBUG,"AuToDark.initEvent", "开始加载更多数据")
+            LogUtils.log(Log.DEBUG,kTag, "开始加载更多数据")
             isLoadMore = true
             object : CountDownTimer(1000, 500) {
                 override fun onTick(millisUntilFinished: Long) {
-                    LogUtils.log(Log.DEBUG,"AuToDark.initEvent", "加载中... 剩余时间: $millisUntilFinished")
+                    LogUtils.log(Log.DEBUG,kTag, "加载中... 剩余时间: $millisUntilFinished")
                 }
 
                 override fun onFinish() {
-                    LogUtils.log(Log.DEBUG,"AuToDark.initEvent", "加载更多完成")
+                    LogUtils.log(Log.DEBUG,kTag, "加载更多完成")
                     isLoadMore = false
                     offset++
                     dataBeans.addAll(queryNotificationRecord())
                     refreshLayout.finishLoadMore()
                     weakReferenceHandler.sendEmptyMessage(2022061901)
-                    LogUtils.log(Log.DEBUG,"AuToDark.initEvent", "数据加载完成，更新 UI")
+                    LogUtils.log(Log.DEBUG,kTag, "数据加载完成，更新 UI")
                 }
             }.start()
         }
@@ -122,19 +136,19 @@ class NoticeRecordActivity : KotlinBaseActivity<ActivityNoticeBinding>(), Handle
     }
 
     override fun handleMessage(msg: Message): Boolean {
-        LogUtils.log(Log.DEBUG,"AuToDark.handleMessage", "处理消息: ${msg.what}")
+        LogUtils.log(Log.DEBUG,kTag, "处理消息: ${msg.what}")
 
         if (msg.what == 2022061901) {
             if (isRefresh || isLoadMore) {
-                LogUtils.log(Log.DEBUG,"AuToDark.handleMessage", "刷新或加载更多数据，通知适配器更新")
+                LogUtils.log(Log.DEBUG,kTag, "刷新或加载更多数据，通知适配器更新")
                 noticeAdapter.notifyDataSetChanged()
             } else { // 首次加载数据
-                LogUtils.log(Log.DEBUG,"AuToDark.handleMessage", "首次加载数据")
+                LogUtils.log(Log.DEBUG,kTag, "首次加载数据")
                 if (dataBeans.size == 0) {
-                    LogUtils.log(Log.DEBUG,"AuToDark.handleMessage", "数据为空，显示空视图")
+                    LogUtils.log(Log.DEBUG,kTag, "数据为空，显示空视图")
                     binding.emptyView.visibility = View.VISIBLE
                 } else {
-                    LogUtils.log(Log.DEBUG,"AuToDark.handleMessage", "数据存在，隐藏空视图")
+                    LogUtils.log(Log.DEBUG,kTag, "数据存在，隐藏空视图")
                     binding.emptyView.visibility = View.GONE
 
                     noticeAdapter = object : NormalRecyclerAdapter<com.autodark.bean.NotificationBean>(
@@ -154,7 +168,7 @@ class NoticeRecordActivity : KotlinBaseActivity<ActivityNoticeBinding>(), Handle
                         RecyclerViewItemDivider(1, Color.LTGRAY)
                     )
                     binding.notificationView.adapter = noticeAdapter
-                    LogUtils.log(Log.DEBUG,"AuToDark.handleMessage", "适配器设置完成，数据数量: ${dataBeans.size}")
+                    LogUtils.log(Log.DEBUG,kTag, "适配器设置完成，数据数量: ${dataBeans.size}")
                 }
             }
         }
@@ -162,7 +176,7 @@ class NoticeRecordActivity : KotlinBaseActivity<ActivityNoticeBinding>(), Handle
     }
 
     private fun queryNotificationRecord(): MutableList<com.autodark.bean.NotificationBean> {
-        LogUtils.log(Log.DEBUG,"AuToDark.queryNotificationRecord", "查询通知记录，当前偏移量: $offset")
+        LogUtils.log(Log.DEBUG,kTag, "查询通知记录，当前偏移量: $offset")
 
         val records = notificationBeanDao.queryBuilder()
             .orderDesc(com.autodark.greendao.NotificationBeanDao.Properties.PostTime)
@@ -170,7 +184,7 @@ class NoticeRecordActivity : KotlinBaseActivity<ActivityNoticeBinding>(), Handle
             .limit(15)
             .list()
 
-        LogUtils.log(Log.DEBUG,"AuToDark.queryNotificationRecord", "查询到的记录数量: ${records.size}")
+        LogUtils.log(Log.DEBUG,kTag, "查询到的记录数量: ${records.size}")
         return records
     }
 

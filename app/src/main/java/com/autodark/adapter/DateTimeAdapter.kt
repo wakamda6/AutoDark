@@ -36,14 +36,14 @@ class DateTimeAdapter(context: Context, private val dataBeans: MutableList<com.a
     override fun getItemId(position: Int): Long = position.toLong()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int):ItemViewHolder {
-        Log.d(kTag, "创建视图持有者，类型: $viewType")
+        LogUtils.log(Log.DEBUG,kTag, "创建视图持有者，类型: $viewType")
         return ItemViewHolder(
             layoutInflater.inflate(R.layout.item_timer_rv_l, parent, false)
         )
     }
 
     override fun onBindViewHolder(holder: ItemViewHolder,position: Int) {
-        Log.d("AuToDark.onBindViewHolder", "绑定视图，位置: $position")
+        LogUtils.log(Log.DEBUG,kTag, "绑定视图，位置: $position")
 
         val timeBean = dataBeans[position]
         holder.dateView.text = timeBean.date
@@ -51,20 +51,20 @@ class DateTimeAdapter(context: Context, private val dataBeans: MutableList<com.a
         holder.weekDayView.text = timeBean.weekDay
 
         holder.itemView.setOnClickListener {
-            Log.d("AuToDark.onBindViewHolder", "单击项目，位置: $position")
+            LogUtils.log(Log.DEBUG,kTag, "单击项目，位置: $position")
             itemClickListener?.onItemClick(position)
         }
 
         // 长按监听
         holder.itemView.setOnLongClickListener {
-            Log.d("AuToDark.onBindViewHolder", "长按项目，位置: $position")
+            LogUtils.log(Log.DEBUG,kTag, "长按项目，位置: $position")
             itemClickListener?.onItemLongClick(position)
             true
         }
 
         val time = "${timeBean.date} ${timeBean.time}"
         if (time.isEarlierThenCurrent()) {
-            Log.d("AuToDark.onBindViewHolder", "任务已过期，时间: $time")
+            LogUtils.log(Log.DEBUG,kTag, "任务已过期，时间: $time")
             holder.countDownTextView.text = "任务已过期"
             holder.countDownTextView.setTextColor(Color.RED)
         } else {
@@ -86,7 +86,7 @@ class DateTimeAdapter(context: Context, private val dataBeans: MutableList<com.a
                 }
 
                 override fun onFinish() {
-                    Log.d("AuToDark.onBindViewHolder", "倒计时结束，位置: $position")
+                    LogUtils.log(Log.DEBUG,kTag, "倒计时结束，位置: $position")
                     itemClickListener?.onCountDownFinish()
                     holder.countDownTextView.text = "任务已过期"
                     holder.countDownTextView.setTextColor(Color.RED)
@@ -100,7 +100,7 @@ class DateTimeAdapter(context: Context, private val dataBeans: MutableList<com.a
         val downTimer = countDownTimerHashMap[bean.uuid]
         if (downTimer != null) {
             downTimer.cancel()
-            Log.d(kTag, "停止倒计时器: ${bean.weekDay} ${bean.date} ${bean.time}")
+            LogUtils.log(Log.DEBUG,kTag, "停止倒计时器: ${bean.weekDay} ${bean.date} ${bean.time}")
         }
     }
 

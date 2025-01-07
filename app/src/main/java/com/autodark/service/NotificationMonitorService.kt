@@ -15,8 +15,10 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.autodark.extensions.createTextMail
 import com.autodark.extensions.openApplication
 import com.autodark.extensions.sendTextMail
+import com.autodark.fragment.SettingsFragment
 import com.autodark.ui.MainActivity
 import com.autodark.utils.Constant
+import com.autodark.utils.Constant.FOREGROUND_RUNNING_SERVICE_TITLE
 import com.autodark.utils.CountDownTimerManager
 import com.pengxh.kt.lite.extensions.getSystemService
 import com.pengxh.kt.lite.extensions.show
@@ -30,16 +32,14 @@ import java.util.UUID
 
     class NotificationMonitorService : NotificationListenerService(), LifecycleOwner {
 
-    private val kTag = "AuToDark.NotificationMonitorService"
+    private val kTag = "NotificationMonitorService"
     private val registry = LifecycleRegistry(this)
 
-    private var isListenerConnected = false
-
-    private fun sendMessageToMainActivity(message: String) {
-        val mIntent = Intent("com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION")
-        mIntent.putExtra("message", message)
-        LogUtils.log(Log.DEBUG,kTag, "即将向MainActivity发送消息：$message")
-        LocalBroadcastManager.getInstance(this).sendBroadcast(mIntent) // 发送本地广播
+    private fun sendBroadcast(message: String) {
+        LogUtils.log(Log.DEBUG,kTag, "发送打卡结果到Main activity:$message")
+        val intent = Intent("com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION")
+        intent.putExtra("message", message)
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent) // 发送本地广播
     }
 
     override fun getLifecycle(): Lifecycle {
@@ -52,19 +52,29 @@ import java.util.UUID
     /**
      * 有可用的并且和通知管理器连接成功时回调
      */
+    private var isInitialized = false
     override fun onListenerConnected() {
-        if (!isListenerConnected) {
-            LogUtils.log(Log.DEBUG, kTag, "创建通知监听服务")
-            isListenerConnected = true
-        } else {
-            LogUtils.log(Log.DEBUG, kTag, "通知监听服务已经创建")
+        try {
+            if (!isInitialized) {
+                isInitialized = true
+                LogUtils.log(Log.DEBUG,kTag, "通知监听服务初始化")
+                SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
+            }else{
+                LogUtils.log(Log.DEBUG,kTag, "通知监听服务已经初始化,不再初始化...")
+            }
+        } catch (e: Exception) {
+            LogUtils.log(Log.ERROR, kTag, "发生异常: ${e.message}")
+            isInitialized = false // 允许重新注册
+            // 其他错误处理逻辑
         }
+
     }
 
     /**
      * 当有新通知到来时会回调
      */
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        LogUtils.log(Log.DEBUG,kTag, "收到新通知")
 
         val extras = sbn.notification.extras
         // 获取接收消息APP的包名
@@ -74,19 +84,17 @@ import java.util.UUID
         // 获取接收消息的内容
         val notice = extras.getString(Notification.EXTRA_TEXT)
 
-        val key = sbn.key
-        val postTime = sbn.postTime
-        LogUtils.log(Log.DEBUG,kTag, "收到新通知：$notice from key: $key, postTime: $postTime")
-
         if (notice.isNullOrBlank()) {
             LogUtils.log(Log.DEBUG, kTag, "通知发出者包名: $packageName")
             LogUtils.log(Log.DEBUG,kTag, "通知内容为空，忽略")
             return
         }
 
-        if (notice.contains("正在监听MQTT消息")){
-            return
+        if(!notice?.equals(FOREGROUND_RUNNING_SERVICE_TITLE)){
+            LogUtils.log(Log.DEBUG,kTag, "内容 : $notice")
         }
+
+        SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
 
         val notificationBean = com.autodark.bean.NotificationBean().apply {
             uuid = UUID.randomUUID().toString()
@@ -124,7 +132,7 @@ import java.util.UUID
 
                 //通过mqtt发送通知内容
                 val notification = "dark_success:$title: $notice"
-                sendMessageToMainActivity(notification)
+                sendBroadcast(notification)
 
             }
         } else if (packageName in listOf(Constant.WECHAT, Constant.QQ, Constant.TIM, Constant.ZFB)) {
@@ -138,10 +146,10 @@ import java.util.UUID
                     LogUtils.log(Log.DEBUG,kTag, "电量邮件发送，剩余电量: $capacity%")
                 }
             } else {
-                val mKey = SaveKeyValues.getValue(Constant.DING_DING_KEY, "打卡") as String
-                if (notice.contains(mKey)) {
-                    LogUtils.log(Log.DEBUG,kTag, "打开钉钉应用")
+                val key = SaveKeyValues.getValue(Constant.DING_DING_KEY, "打卡") as String
+                if (notice.contains(key)) {
                     openApplication(Constant.DING_DING)
+                    LogUtils.log(Log.DEBUG,kTag, "打开钉钉应用")
                 }
             }
         }
@@ -172,11 +180,12 @@ import java.util.UUID
      * 当有通知移除时会回调
      */
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
-
+        LogUtils.log(Log.DEBUG,kTag, "通知已移除")
     }
 
     override fun onListenerDisconnected() {
-        isListenerConnected = false
-        LogUtils.log(Log.DEBUG, kTag, "通知监听服务已销毁")
+        LogUtils.log(Log.DEBUG,kTag, "通知监听服务已关闭")
+        SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090802)
+        isInitialized = false
     }
 }

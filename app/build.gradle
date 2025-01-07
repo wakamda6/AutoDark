@@ -9,10 +9,10 @@ android {
 
     defaultConfig {
         applicationId "com.autodark"
-        minSdkVersion 23
+        minSdkVersion 24
         targetSdkVersion 33
         versionCode 1530
-        versionName "1.5.6"
+        versionName "2.0.0.0"
         flavorDimensions "versionCode"
     }
 
@@ -35,10 +35,10 @@ android {
     def id = "com.${createRandomCode()}.${createRandomCode()}"
     productFlavors {
         auto {
-            //debug
-            applicationId "com.autodark"
+//            debug
+//            applicationId "com.autodark"
 
-//            applicationId = id
+            applicationId = id
         }
     }
     packagingOptions {

@@ -27,7 +27,7 @@ class FloatingWindowService : Service(), Handler.Callback {
         var weakReferenceHandler: WeakReferenceHandler? = null
     }
 
-    private val kTag = "AuToDark.FloatingWindowService"
+    private val kTag = "FloatingWindowService"
     private val windowManager by lazy { getSystemService<WindowManager>() }
     private val floatView by lazy {
         LayoutInflater.from(this).inflate(R.layout.window_floating, null)
@@ -99,9 +99,9 @@ class FloatingWindowService : Service(), Handler.Callback {
                 false
             }
         } catch (e: IllegalStateException) {
-            Log.e(kTag, "onCreate: IllegalStateException", e)
+            LogUtils.log(Log.DEBUG,kTag, "onCreate: IllegalStateException")
         } catch (e: WindowManager.BadTokenException) {
-            Log.e(kTag, "onCreate: BadTokenException", e)
+            LogUtils.log(Log.DEBUG,kTag, "onCreate: BadTokenException")
         }
     }
 

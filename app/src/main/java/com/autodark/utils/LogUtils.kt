@@ -28,7 +28,7 @@ object LogUtils {
         }
 
         // 使用当前时间戳创建文件名
-        val currentTimestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val currentTimestamp = SimpleDateFormat("yyyy_MM_dd_HH_mm_ss", Locale.getDefault()).format(Date())
         val logFileName = "$LOG_FILE_NAME_PREFIX$currentTimestamp.txt"
         logFile = File(logDir, logFileName) // 设置日志文件路径
     }
