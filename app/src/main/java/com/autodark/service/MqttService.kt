@@ -26,6 +26,10 @@ import java.io.PrintWriter
 import java.io.StringWriter
 import android.content.Context
 import android.provider.Settings
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManagerFactory
+import java.security.KeyStore
+import java.security.cert.CertificateFactory
 
 
 /**
@@ -165,7 +169,7 @@ class MqttService : Service(), Handler.Callback {
     }
 
     private fun loadProperties() {
-        mqttServerUrl = "tcp://39.106.230.248:1883"
+        mqttServerUrl = "ssl://***REMOVED***:8883"
         mqttClientId = getUUID()
         LogUtils.log(Log.DEBUG,kTag, "设备唯一ID：$mqttClientId")
         mqttTopicCheckAppAlive = "/topic/$mqttClientId/checkAppAlive"
@@ -214,6 +218,10 @@ class MqttService : Service(), Handler.Callback {
         options.isAutomaticReconnect = true
 
         try {
+            val sslContext = SSLContext.getInstance("TLS")
+            sslContext.init(null, null, null)  // 默认的 TrustManager 和 KeyManager 会被使用
+            options.socketFactory = sslContext.socketFactory  // 设置 socketFactory 为系统默认
+
             mqttClient.connect(options, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
                     LogUtils.log(Log.DEBUG,kTag, "$mqttServerUrl 连接成功")
@@ -225,7 +233,18 @@ class MqttService : Service(), Handler.Callback {
                 }
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
-                    LogUtils.log(Log.ERROR,kTag, "MQTT 通信失败: ${exception?.message}")
+                    if (exception is MqttException) {
+                        // 打印 MqttException 的详细信息
+                        LogUtils.log(Log.ERROR, kTag, "MQTT 通信失败: ${exception.message}")
+                        LogUtils.log(Log.ERROR, kTag, "MqttException 错误码: ${exception.reasonCode}")
+                        LogUtils.log(Log.ERROR, kTag, "MqttException 错误详细信息: ${exception.localizedMessage}")
+
+                        // 打印堆栈跟踪，帮助进一步排查
+                        exception.printStackTrace()
+                    } else {
+                        // 其他异常类型
+                        LogUtils.log(Log.ERROR, kTag, "未知错误: ${exception?.message}")
+                    }
                     isConnecting = false
                 }
             })
