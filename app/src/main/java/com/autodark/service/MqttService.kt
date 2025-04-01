@@ -26,11 +26,16 @@ import java.io.PrintWriter
 import java.io.StringWriter
 import android.content.Context
 import android.provider.Settings
+import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 import java.security.KeyStore
 import java.security.cert.CertificateFactory
+import javax.crypto.Cipher
+import javax.crypto.CipherInputStream
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 import javax.net.ssl.*
 
 
@@ -200,36 +205,43 @@ class MqttService : Service(), Handler.Callback {
             return
         }
 
-        // 假设你将 p12 文件保存在资源文件夹中
-        val p12File = applicationContext.resources.openRawResource(R.raw.client)  // .p12 文件
-        val p12Password = "123456"  // .p12 文件密码
+        val androidId = getUUID()  // 获取设备的 Android ID
+        val key = generateKeyFromString(androidId)  // 生成AES密钥
 
-        // 加载 KeyStore，包含客户端证书和私钥
+        // 加载加密文件
+        val encryptedP12File = resources.openRawResource(R.raw.client)  // 加载加密后的P12文件
+        val encryptedCaFile = resources.openRawResource(R.raw.ca)  // 加载加密后的CA证书文件
+
+        // 解密并将结果保存在内存中
+        val p12Bytes = aesDecryptInMemory(encryptedP12File, key)
+        val caBytes = aesDecryptInMemory(encryptedCaFile, key)
+
+        // 加载 .p12 文件
+        val p12Password = "123456".toCharArray()  // p12 文件的密码
         val keyStore = KeyStore.getInstance("PKCS12")
-        keyStore.load(p12File, p12Password.toCharArray())
+        val p12InputStream = p12Bytes.inputStream()
+        keyStore.load(p12InputStream, p12Password)
 
         // 创建 KeyManagerFactory 来管理客户端证书和私钥
         val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
-        keyManagerFactory.init(keyStore, p12Password.toCharArray())
-
-        // 创建 TrustManagerFactory 来验证服务器证书
-        val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-//        trustManagerFactory.init(null as KeyStore?)  // 默认使用系统信任的证书
+        keyManagerFactory.init(keyStore, p12Password)
 
         // 加载 CA 根证书
-        val caInput: InputStream = resources.openRawResource(R.raw.ca)  // CA 根证书
-        val cf = CertificateFactory.getInstance("X.509")
-        val ca = cf.generateCertificate(caInput)
+        val caInputStream = caBytes.inputStream()
+        val certificateFactory = CertificateFactory.getInstance("X.509")
+        val caCertificate = certificateFactory.generateCertificate(caInputStream)
 
         // 创建一个包含 CA 证书的 KeyStore
         val caKeyStore = KeyStore.getInstance(KeyStore.getDefaultType())
         caKeyStore.load(null, null)
-        caKeyStore.setCertificateEntry("ca", ca)
+        caKeyStore.setCertificateEntry("ca", caCertificate)
 
         // 初始化 TrustManagerFactory
+        val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
         trustManagerFactory.init(caKeyStore)
+        //trustManagerFactory.init(null as KeyStore?)  // 默认使用系统信任的证书.不使用系统默认证书，保证内网通信
 
-        // 创建 SSLContext，并设置 KeyManager 和 TrustManager
+        // 使用证书和密钥进行进一步的 SSLContext 设置，确保连接安全
         val sslContext = SSLContext.getInstance("TLS")
         sslContext.init(keyManagerFactory.keyManagers, trustManagerFactory.trustManagers, null)
 
@@ -418,6 +430,53 @@ class MqttService : Service(), Handler.Callback {
     //获取设备唯一ID
     private fun getUUID(): String {
         return Settings.Secure.getString(this.contentResolver, Settings.Secure.ANDROID_ID)
+    }
+
+    // 计算字符串的SHA-256哈希
+    fun hashString(input: String): ByteArray {
+        val sha256 = java.security.MessageDigest.getInstance("SHA-256")
+        return sha256.digest(input.toByteArray(Charsets.UTF_8))
+    }
+
+    // 根据输入字符串生成 AES 密钥
+    fun generateKeyFromString(inputString: String): ByteArray {
+        val stringHash = hashString(inputString)
+
+        // 将哈希值每个字节加1，并将结果转换为 ByteArray
+        val transformedHash = stringHash.map { ((it.toInt() + 1) % 256).toByte() }.toByteArray()
+
+        // 使用前16字节作为AES密钥
+        return transformedHash.take(16).toByteArray()
+    }
+
+    // 解密文件并在内存中处理（不保存到文件）
+    fun aesDecryptInMemory(inputStream: InputStream, key: ByteArray): ByteArray {
+        // 读取加密文件，获取IV（前16字节）
+        val iv = ByteArray(16) // AES的IV长度是16字节
+        inputStream.read(iv) // 读取IV
+
+        // 使用AES解密
+        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        val ivSpec = IvParameterSpec(iv)
+        val secretKey = SecretKeySpec(key, "AES")
+
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, ivSpec)
+
+        // 解密文件内容并将其保存到内存中
+        val cipherInputStream = CipherInputStream(inputStream, cipher)
+        val byteArrayOutputStream = ByteArrayOutputStream()
+
+        var bytesRead: Int
+        val buffer = ByteArray(4096)
+        while (cipherInputStream.read(buffer).also { bytesRead = it } != -1) {
+            byteArrayOutputStream.write(buffer, 0, bytesRead)
+        }
+
+        cipherInputStream.close()
+        byteArrayOutputStream.close()
+
+        // 返回解密后的字节数组
+        return byteArrayOutputStream.toByteArray()
     }
 
     private fun sendBroadcast(message: String) {
