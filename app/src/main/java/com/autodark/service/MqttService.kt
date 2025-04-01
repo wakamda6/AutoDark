@@ -26,10 +26,12 @@ import java.io.PrintWriter
 import java.io.StringWriter
 import android.content.Context
 import android.provider.Settings
+import java.io.InputStream
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 import java.security.KeyStore
 import java.security.cert.CertificateFactory
+import javax.net.ssl.*
 
 
 /**
@@ -198,6 +200,39 @@ class MqttService : Service(), Handler.Callback {
             return
         }
 
+        // 假设你将 p12 文件保存在资源文件夹中
+        val p12File = applicationContext.resources.openRawResource(R.raw.client)  // .p12 文件
+        val p12Password = "123456"  // .p12 文件密码
+
+        // 加载 KeyStore，包含客户端证书和私钥
+        val keyStore = KeyStore.getInstance("PKCS12")
+        keyStore.load(p12File, p12Password.toCharArray())
+
+        // 创建 KeyManagerFactory 来管理客户端证书和私钥
+        val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
+        keyManagerFactory.init(keyStore, p12Password.toCharArray())
+
+        // 创建 TrustManagerFactory 来验证服务器证书
+        val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+//        trustManagerFactory.init(null as KeyStore?)  // 默认使用系统信任的证书
+
+        // 加载 CA 根证书
+        val caInput: InputStream = resources.openRawResource(R.raw.ca)  // CA 根证书
+        val cf = CertificateFactory.getInstance("X.509")
+        val ca = cf.generateCertificate(caInput)
+
+        // 创建一个包含 CA 证书的 KeyStore
+        val caKeyStore = KeyStore.getInstance(KeyStore.getDefaultType())
+        caKeyStore.load(null, null)
+        caKeyStore.setCertificateEntry("ca", ca)
+
+        // 初始化 TrustManagerFactory
+        trustManagerFactory.init(caKeyStore)
+
+        // 创建 SSLContext，并设置 KeyManager 和 TrustManager
+        val sslContext = SSLContext.getInstance("TLS")
+        sslContext.init(keyManagerFactory.keyManagers, trustManagerFactory.trustManagers, null)
+
 
         mqttClient = MqttAndroidClient(applicationContext, mqttServerUrl, mqttClientId, Ack.AUTO_ACK)
         val options = MqttConnectOptions().apply {
@@ -214,14 +249,13 @@ class MqttService : Service(), Handler.Callback {
             val willMessage = "darkPhone_offline_at_" + System.currentTimeMillis().timestampToCompleteDate()
 
             setWill(mqttTopicLastWill, willMessage.toByteArray(), willQoS, true)
+
+            // 使用自定义的 SSLContext
+            socketFactory = sslContext.socketFactory
         }
         options.isAutomaticReconnect = true
 
         try {
-            val sslContext = SSLContext.getInstance("TLS")
-            sslContext.init(null, null, null)  // 默认的 TrustManager 和 KeyManager 会被使用
-            options.socketFactory = sslContext.socketFactory  // 设置 socketFactory 为系统默认
-
             mqttClient.connect(options, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
                     LogUtils.log(Log.DEBUG,kTag, "$mqttServerUrl 连接成功")
