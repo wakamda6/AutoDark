@@ -25,6 +25,7 @@ import com.pengxh.kt.lite.utils.WeakReferenceHandler
 import java.io.PrintWriter
 import java.io.StringWriter
 import android.content.Context
+import android.content.res.Resources
 import android.provider.Settings
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
@@ -142,7 +143,6 @@ class MqttService : Service(), Handler.Callback {
         connectivityManager.registerDefaultNetworkCallback(networkCallback)
 
         //发送需要订阅的主题
-
         val message = "测试请求主题：$mqttTopicCheckAppAlive\n" +
                 "测试回复主题:$mqttTopicCheckAppAliveResult\n" +
                 "打卡请求主题:$mqttTopicDark\n" +
@@ -205,17 +205,40 @@ class MqttService : Service(), Handler.Callback {
             return
         }
 
+        try {
+            // 尝试加载加密文件
+            val encryptedP12File = resources.openRawResource(R.raw.client)
+            val encryptedCaFile = resources.openRawResource(R.raw.ca)
+        } catch (e: Resources.NotFoundException) {
+            // 如果文件不存在，打印异常信息
+            LogUtils.log(Log.WARN, kTag, "加密文件不存在: ${e.message}")
+            return // 直接返回
+        }
+
         val androidId = getUUID()  // 获取设备的 Android ID
         val key = generateKeyFromString(androidId)
+        if (key.isEmpty()) {
+            LogUtils.log(Log.ERROR, kTag, "密钥生成失败")
+            // 处理解密失败的情况，比如返回或终止操作
+            return
+        }
 
         // 加载加密文件
         val encryptedP12File = resources.openRawResource(R.raw.client)
         val encryptedCaFile = resources.openRawResource(R.raw.ca)
 
         val p12Bytes = aesDecryptInMemory(encryptedP12File, key)
-        LogUtils.log(Log.INFO,kTag, "P12大小: ${p12Bytes.size} 字节")
+        if (p12Bytes.isEmpty()) {
+            LogUtils.log(Log.ERROR, kTag, "解密 CA 文件失败")
+            // 处理解密失败的情况，比如返回或终止操作
+            return
+        }
         val caBytes = aesDecryptInMemory(encryptedCaFile, key)
-        LogUtils.log(Log.INFO,kTag, "CA大小: ${p12Bytes.size} 字节")
+        if (caBytes.isEmpty()) {
+            LogUtils.log(Log.ERROR, kTag, "解密 CA 文件失败")
+            // 处理解密失败的情况，比如返回或终止操作
+            return
+        }
 
         // 加载 .p12 文件
         val p12P = androidId.toCharArray()
@@ -450,44 +473,67 @@ class MqttService : Service(), Handler.Callback {
     }
 
     private fun generateKeyFromString(inputString: String): ByteArray {
-        val stringHash = hashString(inputString)
+        return try {
+            // 计算字符串的哈希值
+            val stringHash = hashString(inputString)
 
-        // 将哈希值每个字节加1，并将结果转换为 ByteArray
-        val transformedHash = stringHash.map { ((it.toInt() + 1) % 256).toByte() }.toByteArray()
+            // 将哈希值每个字节加1，并将结果转换为 ByteArray
+            val transformedHash = stringHash.map {
+                ((it.toInt() + 1) % 256).toByte()
+            }.toByteArray()
 
-        // 使用前16字节
-        return transformedHash.take(16).toByteArray()
+            // 使用前16字节
+            transformedHash.take(16).toByteArray()
+
+        } catch (e: Exception) {
+            // 捕获任何异常并记录日志
+            LogUtils.log(Log.ERROR, kTag, "生成密钥时发生异常: ${e.message}")
+            ByteArray(0)  // 返回空字节数组表示生成密钥失败
+        }
     }
 
     // 解密文件并在内存中处理（不保存到文件）
     private fun aesDecryptInMemory(inputStream: InputStream, key: ByteArray): ByteArray {
-        // 读取加密文件，获取IV（前16字节）
-        val iv = ByteArray(16) // AES的IV长度是16字节
-        inputStream.read(iv) // 读取IV
+        try {
+            // 读取加密文件，获取IV（前16字节）
+            val iv = ByteArray(16) // AES的IV长度是16字节
+            val bytesRead = inputStream.read(iv) // 读取IV
+            if (bytesRead != 16) {
+                LogUtils.log(Log.ERROR, kTag, "IV长度不正确，解密失败")
+                return ByteArray(0)  // 返回空字节数组
+            }
 
-        // 使用AES解密
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        val ivSpec = IvParameterSpec(iv)
-        val secretKey = SecretKeySpec(key, "AES")
+            // 使用AES解密
+            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            val ivSpec = IvParameterSpec(iv)
+            val secretKey = SecretKeySpec(key, "AES")
 
-        cipher.init(Cipher.DECRYPT_MODE, secretKey, ivSpec)
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, ivSpec)
 
-        // 解密文件内容并将其保存到内存中
-        val cipherInputStream = CipherInputStream(inputStream, cipher)
-        val byteArrayOutputStream = ByteArrayOutputStream()
+            // 解密文件内容并将其保存到内存中
+            val cipherInputStream = CipherInputStream(inputStream, cipher)
+            val byteArrayOutputStream = ByteArrayOutputStream()
 
-        var bytesRead: Int
-        val buffer = ByteArray(4096)
-        while (cipherInputStream.read(buffer).also { bytesRead = it } != -1) {
-            byteArrayOutputStream.write(buffer, 0, bytesRead)
+            var buffer = ByteArray(4096)
+            var bytesReadInLoop: Int
+            while (cipherInputStream.read(buffer).also { bytesReadInLoop = it } != -1) {
+                byteArrayOutputStream.write(buffer, 0, bytesReadInLoop)
+            }
+
+            cipherInputStream.close()
+            byteArrayOutputStream.close()
+
+            // 返回解密后的字节数组
+            return byteArrayOutputStream.toByteArray()
+
+        } catch (e: Exception) {
+            LogUtils.log(Log.ERROR, kTag, "解密失败: ${e.message}")
         }
 
-        cipherInputStream.close()
-        byteArrayOutputStream.close()
-
-        // 返回解密后的字节数组
-        return byteArrayOutputStream.toByteArray()
+        // 出现任何错误时返回空字节数组
+        return ByteArray(0)
     }
+
 
     private fun sendBroadcast(message: String) {
         LogUtils.log(Log.DEBUG,kTag, "发送本机mqtt主题到Main activity:$message")
