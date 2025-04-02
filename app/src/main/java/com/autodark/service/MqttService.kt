@@ -248,7 +248,7 @@ class MqttService : Service(), Handler.Callback {
         //trustManagerFactory.init(null as KeyStore?)  // 默认使用系统信任的证书.不使用系统默认证书，保证内网通信
 
         // 使用证书和密钥进行进一步的 SSLContext 设置，确保连接安全
-        val sslContext = SSLContext.getInstance("TLSv1.2")
+        val sslContext = SSLContext.getInstance("TLSv1.3")
         try {
             sslContext.init(keyManagerFactory.keyManagers, trustManagerFactory.trustManagers, null)
             LogUtils.log(Log.DEBUG,kTag, "SSLContext 初始化成功")
