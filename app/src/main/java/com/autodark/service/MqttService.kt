@@ -206,25 +206,31 @@ class MqttService : Service(), Handler.Callback {
         }
 
         val androidId = getUUID()  // 获取设备的 Android ID
-        val key = generateKeyFromString(androidId)  // 生成AES密钥
+        val key = generateKeyFromString(androidId)
 
         // 加载加密文件
-        val encryptedP12File = resources.openRawResource(R.raw.client)  // 加载加密后的P12文件
-        val encryptedCaFile = resources.openRawResource(R.raw.ca)  // 加载加密后的CA证书文件
+        val encryptedP12File = resources.openRawResource(R.raw.client)
+        val encryptedCaFile = resources.openRawResource(R.raw.ca)
 
-        // 解密并将结果保存在内存中
         val p12Bytes = aesDecryptInMemory(encryptedP12File, key)
+        LogUtils.log(Log.INFO,kTag, "P12大小: ${p12Bytes.size} 字节")
         val caBytes = aesDecryptInMemory(encryptedCaFile, key)
+        LogUtils.log(Log.INFO,kTag, "CA大小: ${p12Bytes.size} 字节")
 
         // 加载 .p12 文件
-        val p12Password = "123456".toCharArray()  // p12 文件的密码
+        val p12P = androidId.toCharArray()
         val keyStore = KeyStore.getInstance("PKCS12")
         val p12InputStream = p12Bytes.inputStream()
-        keyStore.load(p12InputStream, p12Password)
+        try {
+            keyStore.load(p12InputStream, p12P)
+            LogUtils.log(Log.INFO,kTag, "P12 证书加载成功")
+        } catch (e: Exception) {
+            LogUtils.log(Log.WARN,kTag, "P12 证书加载失败: ${e.message}")
+        }
 
         // 创建 KeyManagerFactory 来管理客户端证书和私钥
         val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
-        keyManagerFactory.init(keyStore, p12Password)
+        keyManagerFactory.init(keyStore, p12P)
 
         // 加载 CA 根证书
         val caInputStream = caBytes.inputStream()
@@ -242,8 +248,13 @@ class MqttService : Service(), Handler.Callback {
         //trustManagerFactory.init(null as KeyStore?)  // 默认使用系统信任的证书.不使用系统默认证书，保证内网通信
 
         // 使用证书和密钥进行进一步的 SSLContext 设置，确保连接安全
-        val sslContext = SSLContext.getInstance("TLS")
-        sslContext.init(keyManagerFactory.keyManagers, trustManagerFactory.trustManagers, null)
+        val sslContext = SSLContext.getInstance("TLSv1.2")
+        try {
+            sslContext.init(keyManagerFactory.keyManagers, trustManagerFactory.trustManagers, null)
+            LogUtils.log(Log.DEBUG,kTag, "SSLContext 初始化成功")
+        } catch (e: Exception) {
+            LogUtils.log(Log.WARN,kTag, "SSLContext 初始化失败: ${e.message}")
+        }
 
 
         mqttClient = MqttAndroidClient(applicationContext, mqttServerUrl, mqttClientId, Ack.AUTO_ACK)
@@ -433,24 +444,23 @@ class MqttService : Service(), Handler.Callback {
     }
 
     // 计算字符串的SHA-256哈希
-    fun hashString(input: String): ByteArray {
+    private fun hashString(input: String): ByteArray {
         val sha256 = java.security.MessageDigest.getInstance("SHA-256")
         return sha256.digest(input.toByteArray(Charsets.UTF_8))
     }
 
-    // 根据输入字符串生成 AES 密钥
-    fun generateKeyFromString(inputString: String): ByteArray {
+    private fun generateKeyFromString(inputString: String): ByteArray {
         val stringHash = hashString(inputString)
 
         // 将哈希值每个字节加1，并将结果转换为 ByteArray
         val transformedHash = stringHash.map { ((it.toInt() + 1) % 256).toByte() }.toByteArray()
 
-        // 使用前16字节作为AES密钥
+        // 使用前16字节
         return transformedHash.take(16).toByteArray()
     }
 
     // 解密文件并在内存中处理（不保存到文件）
-    fun aesDecryptInMemory(inputStream: InputStream, key: ByteArray): ByteArray {
+    private fun aesDecryptInMemory(inputStream: InputStream, key: ByteArray): ByteArray {
         // 读取加密文件，获取IV（前16字节）
         val iv = ByteArray(16) // AES的IV长度是16字节
         inputStream.read(iv) // 读取IV
