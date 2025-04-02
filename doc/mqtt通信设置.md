@@ -8,13 +8,15 @@ mosquitto_passwd /etc/mosquitto/pwfile.txt another_username
 mosquitto_passwd -D /etc/mosquitto/pwfile.txt another_username
 ```
 
+# 加密设置
+
+mqtt代理地址： ssl://***REMOVED***:8883
+
+仅支持双向认证，TLS版本为1.3
+
 ## topic设置
 
 qos全部设置为1
-
-**#** **mqtt代理地址**
-
-tcp://39.106.230.248:1883
 
 **#** **客户端ID规则**
 
@@ -47,8 +49,3 @@ tcp://39.106.230.248:1883
   darkPhone_offline_at_+年月日时分秒
 
 \> result主题不需要客户端订阅,仅订阅checkAppAlive和dark并设置遗嘱
-
-
-**#** **例外**
-
-esp32设备为例外设备，其ID,用户名，密码都为00000000-0000-0000-0000-000000000000
