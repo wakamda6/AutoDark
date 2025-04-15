@@ -36,9 +36,8 @@ android {
     productFlavors {
         auto {
 //            debug
-//            applicationId "com.autodark"
-
-            applicationId = id
+            applicationId "com.autodark"
+//            applicationId = id
         }
     }
     packagingOptions {
