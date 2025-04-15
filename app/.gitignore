@@ -1,2 +1,3 @@
 /build
-src/main/assets/config.properties
+/src/main/res/raw/ca.en
+/src/main/res/raw/client.en
