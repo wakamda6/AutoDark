@@ -3,15 +3,14 @@ package com.autodark.ui
 import android.content.*
 import android.os.Bundle
 import android.view.KeyEvent
-import android.view.MenuItem
 import androidx.fragment.app.Fragment
 import com.autodark.R
 import com.autodark.databinding.ActivityMainBinding
 import com.autodark.fragment.SettingsFragment
 import com.pengxh.kt.lite.base.KotlinBaseActivity
 import com.pengxh.kt.lite.extensions.show
-import com.pengxh.kt.lite.widget.dialog.AlertMessageDialog
 import android.util.Log
+import android.util.Patterns
 import android.view.WindowManager
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -35,7 +34,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     //页面设置
     private val fragmentPages = ArrayList<Fragment>()
     private lateinit var insetsController: WindowInsetsControllerCompat
-    private var menuItem: MenuItem? = null
     private var clickTime: Long = 0
 
     //广播设置
@@ -74,21 +72,33 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
         val fragmentAdapter = BaseFragmentAdapter(supportFragmentManager, fragmentPages)
         binding.viewPager.adapter = fragmentAdapter
-        val isFirst = SaveKeyValues.getValue("isFirst", true) as Boolean
-        if (isFirst) {
-            AlertMessageDialog.Builder()
-                .setContext(this)
-                .setTitle("温馨提醒")
-                .setMessage("本软件仅供内部使用，严禁商用或者用作其他非法用途")
-                .setPositiveButton("知道了")
-                .setOnDialogButtonClickListener(object :
-                    AlertMessageDialog.OnDialogButtonClickListener {
-                    override fun onConfirmClick() {
-                        SaveKeyValues.putValue("isFirst", false)
-                    }
-                }).build().show()
-        }
+        binding.viewPager.offscreenPageLimit = fragmentPages.size  // 强制加载所有 Fragment
 
+        binding.viewPager.post {
+            val settingsFragment = fragmentPages[0] as? SettingsFragment
+            if (settingsFragment?.isAdded == true && settingsFragment.view != null) {
+                // 判断邮箱是否已经填入
+                val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
+                val isValidEmail = emailAddress.isNotEmpty() && Patterns.EMAIL_ADDRESS.matcher(emailAddress).matches()
+                if (!isValidEmail) {
+                    settingsFragment.onStartupCheck(2){}
+                }
+
+                //判断证书
+                val clientEn = SaveKeyValues.getValue(Constant.CLIENT_EN, "") as String
+                if (clientEn.isEmpty()) {
+                    settingsFragment.onStartupCheck(3){}
+                }
+                //判断CA证书
+                val caEn = SaveKeyValues.getValue(Constant.CA_EN, "") as String
+                if (caEn.isEmpty()) {
+                    settingsFragment.onStartupCheck(4){}
+                }
+            }
+        }
+    }
+
+    fun other_init(){
         // 创建并注册本地广播接收器
         notifyReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -107,6 +117,8 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         val notifyFilter = IntentFilter(notifyAction)
         LocalBroadcastManager.getInstance(this).registerReceiver(notifyReceiver, notifyFilter)
 
+        // 创建并注册mqtt前台服务，接收主页面的ID数据并广播给mqtt
+        val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
         mqttReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 // 处理接收到的消息
@@ -114,7 +126,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                 if (intent?.action == mqttTopicAction) {
                     // 发送本机主题邮件
                     LogUtils.log(Log.DEBUG, kTag, "收到mqtt服务的通知：$message")
-                    val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
                     if (emailAddress.isEmpty()) {
                         LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 邮箱地址为空")
                         if (context != null) {
@@ -137,6 +148,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
         startService(Intent(this, MqttService::class.java))
     }
+
 
     private fun sendBroadcast(message: String) {
         LogUtils.log(Log.DEBUG,kTag, "发送打卡结果到Mqtt服务:$message")

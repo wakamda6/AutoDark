@@ -1,6 +1,7 @@
 package com.autodark.fragment
 
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
@@ -9,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Message
+import android.provider.OpenableColumns
 import android.provider.Settings
 import android.text.TextUtils
 import android.view.LayoutInflater
@@ -35,11 +37,25 @@ import com.pengxh.kt.lite.widget.dialog.AlertInputDialog
 import com.pengxh.kt.lite.widget.dialog.BottomActionSheet
 import com.autodark.utils.LogUtils
 import android.util.Log
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import java.io.File
+import java.io.FileOutputStream
 
 
 class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.Callback {
 
     private val kTag = "SettingsFragment"
+
+    // 上传文件类型
+    enum class UploadType {
+        CLIENT_FILE,
+        CA_FILE
+    }
+    private var currentUploadType: UploadType? = null
+    private var onUploadSuccess: (() -> Unit)? = null
+    private var onUploadFailed: (() -> Unit)? = null
+
 
     companion object {
         var weakReferenceHandler: WeakReferenceHandler? = null
@@ -62,41 +78,199 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
         return FragmentSettingsBinding.inflate(inflater, container, false)
     }
 
+    private val filePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        val success = uri?.let {
+            when (currentUploadType) {
+                UploadType.CLIENT_FILE -> handleFileSelection(it, "client.en")
+                UploadType.CA_FILE -> handleFileSelection(it, "ca.en")
+                else -> false
+            }
+        } ?: false
+
+        if (success) {
+            onUploadSuccess?.invoke()
+        } else {
+            onUploadFailed?.invoke()
+        }
+    }
+
+
+    private fun handleFileSelection(uri: Uri, expectedFileName: String): Boolean {
+        val fileName = getFileNameFromUri(requireContext(), uri)
+        return if (fileName == expectedFileName) {
+            saveFileToInternalStorage(uri, fileName)
+        } else {
+            false
+        }
+    }
+
+    // 获取文件名的方法
+    private fun getFileNameFromUri(context: Context, uri: Uri): String {
+        var result: String? = null
+        if (uri.scheme == "content") {
+            val cursor = context.contentResolver.query(uri, null, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    result = it.getString(it.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+                }
+            }
+        }
+        if (result == null) {
+            result = uri.path
+            val cut = result?.lastIndexOf('/')
+            if (cut != -1) {
+                result = result?.substring(cut!! + 1)
+            }
+        }
+        return result ?: "unknown"
+    }
+
+    // 保存文件到内部存储
+    private fun saveFileToInternalStorage(uri: Uri, fileName: String): Boolean {
+        return try {
+            val inputStream = requireContext().contentResolver.openInputStream(uri)
+            val outputFile = File(requireContext().filesDir, fileName)
+            val outputStream = FileOutputStream(outputFile)
+
+            inputStream?.copyTo(outputStream)
+
+            inputStream?.close()
+            outputStream.close()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    private fun doSomethingAfterSuccess() {
+        Toast.makeText(requireContext(), "后续操作已执行", Toast.LENGTH_SHORT).show()
+    }
+
+
+
     override fun initOnCreate(savedInstanceState: Bundle?) {
         weakReferenceHandler = WeakReferenceHandler(this)
         binding.appVersion.text = com.autodark.BuildConfig.VERSION_NAME
         LogUtils.log(Log.DEBUG,kTag,"Fragment 创建，应用版本: ${com.autodark.BuildConfig.VERSION_NAME}")
     }
 
+    fun onStartupCheck(value:Int,onSuccess: (() -> Unit)? = null) {
+        if(value == 1){
+
+        }else if(value == 2){
+            //接收邮箱设置
+            AlertInputDialog.Builder()
+                .setContext(requireContext())
+                .setTitle("设置接收邮箱")
+                .setHintMessage("请输入接收邮箱")
+                .setNegativeButton("退出应用")
+                .setPositiveButton("确定")
+                .setOnDialogButtonClickListener(object : AlertInputDialog.OnDialogButtonClickListener {
+                    override fun onConfirmClick(value: String) {
+                        if (!TextUtils.isEmpty(value)) {
+                            LogUtils.log(Log.DEBUG, "SettingsFragment", "接收邮箱设置为: $value")
+                            SaveKeyValues.putValue(Constant.EMAIL_ADDRESS, value)
+                            binding.emailTextView.text = value
+                            onSuccess?.invoke()
+                        } else {
+                            "接收邮箱不能为空".show(requireContext())
+                            onStartupCheck(1,onSuccess) // 递归再次弹出
+                        }
+                    }
+
+                    override fun onCancelClick() {
+                        requireActivity().finishAffinity() // 退出整个应用
+                    }
+                }).build().show()
+        }else if(value == 3){
+            currentUploadType = UploadType.CLIENT_FILE
+
+            // 成功后你要执行的操作（自定义）
+            onUploadSuccess = {
+                Toast.makeText(requireContext(), "client.en 上传成功", Toast.LENGTH_SHORT).show()
+                doSomethingAfterSuccess()
+            }
+            onUploadFailed = {
+                Toast.makeText(requireContext(), "ca.en 上传失败请重新上传", Toast.LENGTH_SHORT).show()
+                onStartupCheck(3,onSuccess)
+            }
+
+            filePickerLauncher.launch("*/*")
+        }else if(value == 4){
+            currentUploadType = UploadType.CA_FILE
+
+            onUploadSuccess = {
+                Toast.makeText(requireContext(), "ca.en 上传成功", Toast.LENGTH_SHORT).show()
+                doSomethingAfterSuccess()
+            }
+
+            onUploadFailed = {
+                Toast.makeText(requireContext(), "client.en 上传失败请重新上传", Toast.LENGTH_SHORT).show()
+                onStartupCheck(4,onSuccess)
+            }
+
+            filePickerLauncher.launch("*/*")
+        }
+
+    }
+
     override fun initEvent() {
 
         binding.clientLayout.setOnClickListener {
-
+            LogUtils.log(Log.DEBUG,kTag,"触发客户端证书文件上传")
         }
 
-        binding.emailLayout.setOnClickListener {
-            LogUtils.log(Log.DEBUG,kTag,"邮箱布局点击事件触发")
+        binding.sendEmailLayout.setOnClickListener{
+            LogUtils.log(Log.DEBUG,kTag,"发送邮箱布局点击事件触发")
             AlertInputDialog.Builder()
                 .setContext(requireContext())
-                .setTitle("设置邮箱")
-                .setHintMessage("请输入邮箱")
+                .setTitle("设置发送邮箱")
+                .setHintMessage("请输入发送邮箱")
                 .setNegativeButton("取消")
                 .setPositiveButton("确定")
                 .setOnDialogButtonClickListener(object :
                     AlertInputDialog.OnDialogButtonClickListener {
                     override fun onConfirmClick(value: String) {
                         if (!TextUtils.isEmpty(value)) {
-                            LogUtils.log(Log.DEBUG,kTag,"邮箱设置为: $value")
+                            LogUtils.log(Log.DEBUG,kTag,"发送邮箱设置为: $value")
                             SaveKeyValues.putValue(Constant.EMAIL_ADDRESS, value)
                             binding.emailTextView.text = value
                         } else {
-                            LogUtils.log(Log.DEBUG,kTag,"邮箱输入为空")
+                            LogUtils.log(Log.DEBUG,kTag,"发送邮箱输入为空")
                             "什么都还没输入呢！".show(requireContext())
                         }
                     }
 
                     override fun onCancelClick() {
-                        LogUtils.log(Log.DEBUG,kTag,"邮箱设置取消")
+                        LogUtils.log(Log.DEBUG,kTag,"发送邮箱设置取消")
+                    }
+                }).build().show()
+        }
+
+        binding.emailLayout.setOnClickListener {
+            LogUtils.log(Log.DEBUG,kTag,"接收邮箱布局点击事件触发")
+            AlertInputDialog.Builder()
+                .setContext(requireContext())
+                .setTitle("设置接收邮箱")
+                .setHintMessage("请输入接收邮箱")
+                .setNegativeButton("取消")
+                .setPositiveButton("确定")
+                .setOnDialogButtonClickListener(object :
+                    AlertInputDialog.OnDialogButtonClickListener {
+                    override fun onConfirmClick(value: String) {
+                        if (!TextUtils.isEmpty(value)) {
+                            LogUtils.log(Log.DEBUG,kTag,"接收邮箱设置为: $value")
+                            SaveKeyValues.putValue(Constant.EMAIL_ADDRESS, value)
+                            binding.emailTextView.text = value
+                        } else {
+                            LogUtils.log(Log.DEBUG,kTag,"接收邮箱输入为空")
+                            "什么都还没输入呢！".show(requireContext())
+                        }
+                    }
+
+                    override fun onCancelClick() {
+                        LogUtils.log(Log.DEBUG,kTag,"接收邮箱设置取消")
                     }
                 }).build().show()
         }
@@ -307,6 +481,14 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
     override fun onResume() {
         super.onResume()
         LogUtils.log(Log.DEBUG,kTag,"onResume 被调用")
+
+        val clientEn = SaveKeyValues.getValue(Constant.CLIENT_EN, "") as String
+        binding.clientStatusText.text = clientEn
+        LogUtils.log(Log.DEBUG,kTag,"客户端证书更新为: $clientEn")
+
+        val caEn = SaveKeyValues.getValue(Constant.CA_EN, "") as String
+        binding.caStatusText.text = caEn
+        LogUtils.log(Log.DEBUG,kTag,"CA证书更新为: $caEn")
 
         val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
         binding.emailTextView.text = emailAddress
