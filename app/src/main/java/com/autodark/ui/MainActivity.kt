@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.MenuItem
 import androidx.fragment.app.Fragment
-import androidx.viewpager.widget.ViewPager
 import com.autodark.R
 import com.autodark.databinding.ActivityMainBinding
 import com.autodark.fragment.SettingsFragment
@@ -22,14 +21,12 @@ import com.autodark.adapter.BaseFragmentAdapter
 import com.autodark.extensions.createTextMail
 import com.autodark.extensions.initImmersionBar
 import com.autodark.extensions.sendTextMail
-import com.autodark.fragment.DingDingFragment
 import com.autodark.service.MqttService
 import com.autodark.utils.Constant
 import com.autodark.utils.LogUtils
 import com.pengxh.kt.lite.utils.SaveKeyValues
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
@@ -48,7 +45,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     val mqttTopicAction = "com.example.MQTT_PUBLISH_DARK_TOPIC"
 
     init {
-        fragmentPages.add(DingDingFragment())
         fragmentPages.add(SettingsFragment())
     }
 
@@ -61,6 +57,10 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         insetsController = WindowCompat.getInsetsController(window, binding.rootView)
         binding.rootView.initImmersionBar(this, true, R.color.mainBackground)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    override fun initEvent() {
+
     }
 
 
@@ -136,37 +136,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
 
         startService(Intent(this, MqttService::class.java))
-    }
-
-    override fun initEvent() {
-        binding.bottomNavigation.setOnItemSelectedListener { item ->
-            val itemId: Int = item.itemId
-            if (itemId == R.id.nav_dingding) {
-                binding.viewPager.currentItem = 0
-            } else if (itemId == R.id.nav_settings) {
-                binding.viewPager.currentItem = 1
-            }
-            false
-        }
-
-        binding.viewPager.addOnPageChangeListener(object : ViewPager.OnPageChangeListener {
-            override fun onPageScrolled(
-                position: Int, positionOffset: Float, positionOffsetPixels: Int
-            ) {
-            }
-
-            override fun onPageSelected(position: Int) {
-                if (menuItem != null) {
-                    menuItem!!.isChecked = false
-                } else {
-                    binding.bottomNavigation.menu.getItem(0).isChecked = false
-                }
-                menuItem = binding.bottomNavigation.menu.getItem(position)
-                menuItem!!.isChecked = true
-            }
-
-            override fun onPageScrollStateChanged(state: Int) {}
-        })
     }
 
     private fun sendBroadcast(message: String) {

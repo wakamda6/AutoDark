@@ -39,7 +39,7 @@ import android.util.Log
 
 class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.Callback {
 
-    private val kTag = "DingDingFragment"
+    private val kTag = "SettingsFragment"
 
     companion object {
         var weakReferenceHandler: WeakReferenceHandler? = null
@@ -69,9 +69,11 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
     }
 
     override fun initEvent() {
-        LogUtils.log(Log.DEBUG,kTag,"initEvent 被调用")
 
-        LogUtils.log(Log.DEBUG,kTag,"邮箱布局被点击")
+        binding.clientLayout.setOnClickListener {
+
+        }
+
         binding.emailLayout.setOnClickListener {
             LogUtils.log(Log.DEBUG,kTag,"邮箱布局点击事件触发")
             AlertInputDialog.Builder()
