@@ -22,14 +22,11 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.autodark.R
 import com.pengxh.kt.lite.extensions.timestampToCompleteDate
 import com.pengxh.kt.lite.utils.WeakReferenceHandler
-import java.io.PrintWriter
-import java.io.StringWriter
 import android.content.Context
 import android.content.res.Resources
 import android.provider.Settings
 import com.autodark.BaseApplication
-import java.io.ByteArrayOutputStream
-import java.io.InputStream
+import java.io.*
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 import java.security.KeyStore
@@ -229,16 +226,21 @@ class MqttService : Service(), Handler.Callback {
         }
 
         // 加载加密文件
-        val encryptedP12File = resources.openRawResource(R.raw.client)
-        val encryptedCaFile = resources.openRawResource(R.raw.ca)
+        val encryptedP12File = File(applicationContext.filesDir, "$id.en")
 
-        val p12Bytes = aesDecryptInMemory(encryptedP12File, key)
+        val encryptedCaFile = File(applicationContext.filesDir, "ca.en")
+
+        val p12Bytes = FileInputStream(encryptedP12File).use { inputStream ->
+            aesDecryptInMemory(inputStream, key)
+        }
         if (p12Bytes.isEmpty()) {
             LogUtils.log(Log.ERROR, kTag, "解密 CA 文件失败")
             // 处理解密失败的情况，比如返回或终止操作
             return
         }
-        val caBytes = aesDecryptInMemory(encryptedCaFile, key)
+        val caBytes = FileInputStream(encryptedCaFile).use { inputStream ->
+            aesDecryptInMemory(inputStream, key)
+        }
         if (caBytes.isEmpty()) {
             LogUtils.log(Log.ERROR, kTag, "解密 CA 文件失败")
             // 处理解密失败的情况，比如返回或终止操作
@@ -509,24 +511,34 @@ class MqttService : Service(), Handler.Callback {
             val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
             val ivSpec = IvParameterSpec(iv)
             val secretKey = SecretKeySpec(key, "AES")
-
             cipher.init(Cipher.DECRYPT_MODE, secretKey, ivSpec)
 
             // 解密文件内容并将其保存到内存中
-            val cipherInputStream = CipherInputStream(inputStream, cipher)
-            val byteArrayOutputStream = ByteArrayOutputStream()
+//            val cipherInputStream = CipherInputStream(inputStream, cipher)
+//            val byteArrayOutputStream = ByteArrayOutputStream()
+//
+//            var buffer = ByteArray(4096)
+//            var bytesReadInLoop: Int
+//            while (cipherInputStream.read(buffer).also { bytesReadInLoop = it } != -1) {
+//                byteArrayOutputStream.write(buffer, 0, bytesReadInLoop)
+//            }
+//
+//            cipherInputStream.close()
+//            byteArrayOutputStream.close()
+//
+//            // 返回解密后的字节数组
+//            return byteArrayOutputStream.toByteArray()
 
-            var buffer = ByteArray(4096)
-            var bytesReadInLoop: Int
-            while (cipherInputStream.read(buffer).also { bytesReadInLoop = it } != -1) {
-                byteArrayOutputStream.write(buffer, 0, bytesReadInLoop)
+            CipherInputStream(inputStream, cipher).use { cipherInputStream ->
+                ByteArrayOutputStream().use { outputStream ->
+                    val buffer = ByteArray(4096)
+                    var bytesReadInLoop: Int
+                    while (cipherInputStream.read(buffer).also { bytesReadInLoop = it } != -1) {
+                        outputStream.write(buffer, 0, bytesReadInLoop)
+                    }
+                    return outputStream.toByteArray()
+                }
             }
-
-            cipherInputStream.close()
-            byteArrayOutputStream.close()
-
-            // 返回解密后的字节数组
-            return byteArrayOutputStream.toByteArray()
 
         } catch (e: Exception) {
             LogUtils.log(Log.ERROR, kTag, "解密失败: ${e.message}")

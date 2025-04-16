@@ -204,11 +204,13 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         if (!clientEnPath.exists()) {
             downloadFileSuspend(clientEnUrl, clientEnPath)
         } else {
-            LogUtils.log(Log.DEBUG, kTag, "证书文件已存在")
+            LogUtils.log(Log.DEBUG, kTag, "客户端证书已存在")
         }
 
         if (!caEnPath.exists()) {
             downloadFileSuspend(caEnUrl, caEnPath)
+        }else {
+            LogUtils.log(Log.DEBUG, kTag, "CA证书已存在")
         }
 
         if (!clientEnPath.exists() || !caEnPath.exists()) {
