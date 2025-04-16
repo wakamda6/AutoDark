@@ -95,6 +95,26 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         binding.viewPager.adapter = fragmentAdapter
         binding.viewPager.offscreenPageLimit = fragmentPages.size  // 强制加载所有 Fragment
 
+        // 创建并注册本地广播接收器
+        notifyReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                // 处理接收到的消息
+                val message = intent?.getStringExtra("message")
+                if (intent?.action == notifyAction) {
+                    LogUtils.log(Log.DEBUG,kTag, "收到CountDownTimerManager的通知：$message")
+                    if (message != null) {
+                        if (context != null) {
+                            sendBroadcast(message)
+                        }
+                    }
+                }
+            }
+        }
+        val notifyFilter = IntentFilter(notifyAction)
+        LocalBroadcastManager.getInstance(this).registerReceiver(notifyReceiver, notifyFilter)
+
+        startService(Intent(this, MqttService::class.java))
+
 //        //先设置邮箱
 //        binding.viewPager.post {
 //            val settingsFragment = fragmentPages[0] as? SettingsFragment
@@ -140,6 +160,37 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     }
                 }
             }).build().show()
+    }
+
+    fun other_init(){
+        // 创建并注册mqtt前台服务，接收主页面的ID数据并广播给mqtt
+//        val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
+//        mqttReceiver = object : BroadcastReceiver() {
+//            override fun onReceive(context: Context?, intent: Intent?) {
+//                // 处理接收到的消息
+//                val message = intent?.getStringExtra("message")
+//                if (intent?.action == mqttTopicAction) {
+//                    // 发送本机主题邮件
+//                    LogUtils.log(Log.DEBUG, kTag, "收到mqtt服务的通知：$message")
+//                    if (emailAddress.isEmpty()) {
+//                        LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 邮箱地址为空")
+//                        if (context != null) {
+//                            "邮箱地址为空,请先设置邮箱并重启应用".show(context)
+//                        }
+//                        return
+//                    }
+//                    lifecycleScope.launch(Dispatchers.IO) {
+//                        message?.createTextMail(
+//                            "控制手机需要订阅的主题", emailAddress
+//                        )?.sendTextMail()
+//                        LogUtils.log(Log.DEBUG, kTag, "发送主题成功")
+//                    }
+//                }
+//            }
+//        }
+//        val mqttFilter = IntentFilter(mqttTopicAction)
+//        LocalBroadcastManager.getInstance(this).registerReceiver(mqttReceiver, mqttFilter)
+
     }
 
     private fun initCertsBlocking(context: Context, id: String): Boolean {
@@ -193,60 +244,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             LogUtils.log(Log.DEBUG,kTag, "异常下载 $urlStr: ${e.message}")
         }
     }
-
-
-
-    fun other_init(){
-        // 创建并注册本地广播接收器
-        notifyReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                // 处理接收到的消息
-                val message = intent?.getStringExtra("message")
-                if (intent?.action == notifyAction) {
-                    LogUtils.log(Log.DEBUG,kTag, "收到CountDownTimerManager的通知：$message")
-                    if (message != null) {
-                        if (context != null) {
-                            sendBroadcast(message)
-                        }
-                    }
-                }
-            }
-        }
-        val notifyFilter = IntentFilter(notifyAction)
-        LocalBroadcastManager.getInstance(this).registerReceiver(notifyReceiver, notifyFilter)
-
-        // 创建并注册mqtt前台服务，接收主页面的ID数据并广播给mqtt
-        val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
-        mqttReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                // 处理接收到的消息
-                val message = intent?.getStringExtra("message")
-                if (intent?.action == mqttTopicAction) {
-                    // 发送本机主题邮件
-                    LogUtils.log(Log.DEBUG, kTag, "收到mqtt服务的通知：$message")
-                    if (emailAddress.isEmpty()) {
-                        LogUtils.log(Log.DEBUG,kTag, "onNotificationPosted: 邮箱地址为空")
-                        if (context != null) {
-                            "邮箱地址为空,请先设置邮箱并重启应用".show(context)
-                        }
-                        return
-                    }
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        message?.createTextMail(
-                            "控制手机需要订阅的主题", emailAddress
-                        )?.sendTextMail()
-                        LogUtils.log(Log.DEBUG, kTag, "发送主题成功")
-                    }
-                }
-            }
-        }
-        val mqttFilter = IntentFilter(mqttTopicAction)
-        LocalBroadcastManager.getInstance(this).registerReceiver(mqttReceiver, mqttFilter)
-
-
-        startService(Intent(this, MqttService::class.java))
-    }
-
 
     private fun sendBroadcast(message: String) {
         LogUtils.log(Log.DEBUG,kTag, "发送打卡结果到Mqtt服务:$message")

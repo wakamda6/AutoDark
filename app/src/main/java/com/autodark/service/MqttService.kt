@@ -46,6 +46,8 @@ import javax.net.ssl.*
  * */
 class MqttService : Service(), Handler.Callback {
 
+    var id:String = ""
+
     private val kTag = "MqttService"
     private val notificationId = 1
     private val weakReferenceHandler by lazy { WeakReferenceHandler(this) }
@@ -53,8 +55,6 @@ class MqttService : Service(), Handler.Callback {
     private var notificationBuilder: NotificationCompat.Builder? = null
     private var runningTime = 0L
     private lateinit var updateRunnable: Runnable
-
-    val id = (applicationContext as BaseApplication).androidId
 
     override fun handleMessage(msg: Message): Boolean {
         return true
@@ -84,6 +84,8 @@ class MqttService : Service(), Handler.Callback {
 
 
     override fun onCreate() {
+        id = (applicationContext as BaseApplication).androidId
+
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         // Android 8.0（API 级别 26）及以上版本需要创建通知渠道
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -145,13 +147,13 @@ class MqttService : Service(), Handler.Callback {
         // 注册网络回调
         connectivityManager.registerDefaultNetworkCallback(networkCallback)
 
-        //发送需要订阅的主题
-        val message = "测试请求主题：$mqttTopicCheckAppAlive\n" +
-                "测试回复主题:$mqttTopicCheckAppAliveResult\n" +
-                "打卡请求主题:$mqttTopicDark\n" +
-                "打卡回复主题:$mqttTopicDarkResult\n" +
-                "遗嘱主题:$mqttTopicLastWill\n"
-        sendBroadcast(message)
+//        //发送需要订阅的主题
+//        val message = "测试请求主题：$mqttTopicCheckAppAlive\n" +
+//                "测试回复主题:$mqttTopicCheckAppAliveResult\n" +
+//                "打卡请求主题:$mqttTopicDark\n" +
+//                "打卡回复主题:$mqttTopicDarkResult\n" +
+//                "遗嘱主题:$mqttTopicLastWill\n"
+//        sendBroadcast(message)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -535,12 +537,12 @@ class MqttService : Service(), Handler.Callback {
     }
 
 
-    private fun sendBroadcast(message: String) {
-        LogUtils.log(Log.DEBUG,kTag, "发送本机mqtt主题到Main activity:$message")
-        val intent = Intent(mqttTopicAction)
-        intent.putExtra("message", message)
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent) // 发送本地广播
-    }
+//    private fun sendBroadcast(message: String) {
+//        LogUtils.log(Log.DEBUG,kTag, "发送本机mqtt主题到Main activity:$message")
+//        val intent = Intent(mqttTopicAction)
+//        intent.putExtra("message", message)
+//        LocalBroadcastManager.getInstance(this).sendBroadcast(intent) // 发送本地广播
+//    }
 
     override fun onDestroy() {
         super.onDestroy()
