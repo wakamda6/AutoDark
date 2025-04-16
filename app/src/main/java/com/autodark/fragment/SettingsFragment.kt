@@ -1,7 +1,6 @@
 package com.autodark.fragment
 
 import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
@@ -10,7 +9,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Message
-import android.provider.OpenableColumns
 import android.provider.Settings
 import android.text.TextUtils
 import android.view.LayoutInflater
@@ -37,25 +35,11 @@ import com.pengxh.kt.lite.widget.dialog.AlertInputDialog
 import com.pengxh.kt.lite.widget.dialog.BottomActionSheet
 import com.autodark.utils.LogUtils
 import android.util.Log
-import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
-import java.io.File
-import java.io.FileOutputStream
 
 
 class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.Callback {
 
     private val kTag = "SettingsFragment"
-
-    // 上传文件类型
-    enum class UploadType {
-        CLIENT_FILE,
-        CA_FILE
-    }
-    private var currentUploadType: UploadType? = null
-    private var onUploadSuccess: (() -> Unit)? = null
-    private var onUploadFailed: (() -> Unit)? = null
-
 
     companion object {
         var weakReferenceHandler: WeakReferenceHandler? = null
@@ -77,77 +61,6 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
     ): FragmentSettingsBinding {
         return FragmentSettingsBinding.inflate(inflater, container, false)
     }
-
-    private val filePickerLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        val success = uri?.let {
-            when (currentUploadType) {
-                UploadType.CLIENT_FILE -> handleFileSelection(it, "client.en")
-                UploadType.CA_FILE -> handleFileSelection(it, "ca.en")
-                else -> false
-            }
-        } ?: false
-
-        if (success) {
-            onUploadSuccess?.invoke()
-        } else {
-            onUploadFailed?.invoke()
-        }
-    }
-
-
-    private fun handleFileSelection(uri: Uri, expectedFileName: String): Boolean {
-        val fileName = getFileNameFromUri(requireContext(), uri)
-        return if (fileName == expectedFileName) {
-            saveFileToInternalStorage(uri, fileName)
-        } else {
-            false
-        }
-    }
-
-    // 获取文件名的方法
-    private fun getFileNameFromUri(context: Context, uri: Uri): String {
-        var result: String? = null
-        if (uri.scheme == "content") {
-            val cursor = context.contentResolver.query(uri, null, null, null, null)
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    result = it.getString(it.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
-                }
-            }
-        }
-        if (result == null) {
-            result = uri.path
-            val cut = result?.lastIndexOf('/')
-            if (cut != -1) {
-                result = result?.substring(cut!! + 1)
-            }
-        }
-        return result ?: "unknown"
-    }
-
-    // 保存文件到内部存储
-    private fun saveFileToInternalStorage(uri: Uri, fileName: String): Boolean {
-        return try {
-            val inputStream = requireContext().contentResolver.openInputStream(uri)
-            val outputFile = File(requireContext().filesDir, fileName)
-            val outputStream = FileOutputStream(outputFile)
-
-            inputStream?.copyTo(outputStream)
-
-            inputStream?.close()
-            outputStream.close()
-            true
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
-    }
-
-    private fun doSomethingAfterSuccess() {
-        Toast.makeText(requireContext(), "后续操作已执行", Toast.LENGTH_SHORT).show()
-    }
-
-
 
     override fun initOnCreate(savedInstanceState: Bundle?) {
         weakReferenceHandler = WeakReferenceHandler(this)
@@ -183,44 +96,10 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
                         requireActivity().finishAffinity() // 退出整个应用
                     }
                 }).build().show()
-        }else if(value == 3){
-            currentUploadType = UploadType.CLIENT_FILE
-
-            // 成功后你要执行的操作（自定义）
-            onUploadSuccess = {
-                Toast.makeText(requireContext(), "client.en 上传成功", Toast.LENGTH_SHORT).show()
-                doSomethingAfterSuccess()
-            }
-            onUploadFailed = {
-                Toast.makeText(requireContext(), "ca.en 上传失败请重新上传", Toast.LENGTH_SHORT).show()
-                onStartupCheck(3,onSuccess)
-            }
-
-            filePickerLauncher.launch("*/*")
-        }else if(value == 4){
-            currentUploadType = UploadType.CA_FILE
-
-            onUploadSuccess = {
-                Toast.makeText(requireContext(), "ca.en 上传成功", Toast.LENGTH_SHORT).show()
-                doSomethingAfterSuccess()
-            }
-
-            onUploadFailed = {
-                Toast.makeText(requireContext(), "client.en 上传失败请重新上传", Toast.LENGTH_SHORT).show()
-                onStartupCheck(4,onSuccess)
-            }
-
-            filePickerLauncher.launch("*/*")
         }
-
     }
 
     override fun initEvent() {
-
-        binding.clientLayout.setOnClickListener {
-            LogUtils.log(Log.DEBUG,kTag,"触发客户端证书文件上传")
-        }
-
         binding.sendEmailLayout.setOnClickListener{
             LogUtils.log(Log.DEBUG,kTag,"发送邮箱布局点击事件触发")
             AlertInputDialog.Builder()
@@ -481,14 +360,6 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
     override fun onResume() {
         super.onResume()
         LogUtils.log(Log.DEBUG,kTag,"onResume 被调用")
-
-        val clientEn = SaveKeyValues.getValue(Constant.CLIENT_EN, "") as String
-        binding.clientStatusText.text = clientEn
-        LogUtils.log(Log.DEBUG,kTag,"客户端证书更新为: $clientEn")
-
-        val caEn = SaveKeyValues.getValue(Constant.CA_EN, "") as String
-        binding.caStatusText.text = caEn
-        LogUtils.log(Log.DEBUG,kTag,"CA证书更新为: $caEn")
 
         val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
         binding.emailTextView.text = emailAddress

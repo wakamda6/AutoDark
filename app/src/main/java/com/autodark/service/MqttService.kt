@@ -27,6 +27,7 @@ import java.io.StringWriter
 import android.content.Context
 import android.content.res.Resources
 import android.provider.Settings
+import com.autodark.BaseApplication
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import javax.net.ssl.SSLContext
@@ -52,6 +53,8 @@ class MqttService : Service(), Handler.Callback {
     private var notificationBuilder: NotificationCompat.Builder? = null
     private var runningTime = 0L
     private lateinit var updateRunnable: Runnable
+
+    val id = (applicationContext as BaseApplication).androidId
 
     override fun handleMessage(msg: Message): Boolean {
         return true
@@ -177,7 +180,7 @@ class MqttService : Service(), Handler.Callback {
 
     private fun loadProperties() {
         mqttServerUrl = "ssl://***REMOVED***:8883"
-        mqttClientId = getUUID()
+        mqttClientId = id
         LogUtils.log(Log.DEBUG,kTag, "设备唯一ID：$mqttClientId")
         mqttTopicCheckAppAlive = "/topic/$mqttClientId/checkAppAlive"
         mqttTopicCheckAppAliveResult = "/topic/$mqttClientId/checkAppAliveResult"
@@ -215,8 +218,8 @@ class MqttService : Service(), Handler.Callback {
             return // 直接返回
         }
 
-        val androidId = getUUID()  // 获取设备的 Android ID
-        val key = generateKeyFromString(androidId)
+
+        val key = generateKeyFromString(id)
         if (key.isEmpty()) {
             LogUtils.log(Log.ERROR, kTag, "密钥生成失败")
             // 处理解密失败的情况，比如返回或终止操作
@@ -241,7 +244,7 @@ class MqttService : Service(), Handler.Callback {
         }
 
         // 加载 .p12 文件
-        val p12P = androidId.toCharArray()
+        val p12P = id.toCharArray()
         val keyStore = KeyStore.getInstance("PKCS12")
         val p12InputStream = p12Bytes.inputStream()
         try {
@@ -461,10 +464,7 @@ class MqttService : Service(), Handler.Callback {
         publishMessage(mqttTopicDarkResult,message,qos)
     }
 
-    //获取设备唯一ID
-    private fun getUUID(): String {
-        return Settings.Secure.getString(this.contentResolver, Settings.Secure.ANDROID_ID)
-    }
+
 
     // 计算字符串的SHA-256哈希
     private fun hashString(input: String): ByteArray {

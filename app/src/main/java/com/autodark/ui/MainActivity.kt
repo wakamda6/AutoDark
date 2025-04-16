@@ -16,6 +16,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.autodark.BaseApplication
 import com.autodark.adapter.BaseFragmentAdapter
 import com.autodark.extensions.createTextMail
 import com.autodark.extensions.initImmersionBar
@@ -24,12 +25,25 @@ import com.autodark.service.MqttService
 import com.autodark.utils.Constant
 import com.autodark.utils.LogUtils
 import com.pengxh.kt.lite.utils.SaveKeyValues
+import com.pengxh.kt.lite.widget.dialog.AlertMessageDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
     private val kTag = "MainActivity"
+
+    var id:String = ""
+
+    //ca文件存储位置
+    private var clientEnPath:String = ""
+    private var caEnPath :String = ""
 
     //页面设置
     private val fragmentPages = ArrayList<Fragment>()
@@ -70,10 +84,31 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         // 测试日志输出
         LogUtils.log(Log.INFO, kTag, "应用启动成功")
 
+        //id获取
+        id = (applicationContext as BaseApplication).androidId
+
+        //ca文件存储位置
+        clientEnPath = "${this.filesDir.absolutePath}/$id.en"
+        caEnPath = this.filesDir.absolutePath + "/ca.en"
+
         val fragmentAdapter = BaseFragmentAdapter(supportFragmentManager, fragmentPages)
         binding.viewPager.adapter = fragmentAdapter
         binding.viewPager.offscreenPageLimit = fragmentPages.size  // 强制加载所有 Fragment
 
+        //判断证书是否存在
+        lifecycleScope.launch {
+            val success = ensureCertsReady(this@MainActivity, id)
+            if (success) {
+                // ✅ 证书已下载并准备好，继续后续逻辑
+                Log.d("MainActivity", "证书准备完成，继续执行后续操作")
+            } else {
+                // 如果用户取消，处理取消的情况
+                Log.d("MainActivity", "证书下载失败，操作取消")
+            }
+        }
+
+
+        //设置邮箱
         binding.viewPager.post {
             val settingsFragment = fragmentPages[0] as? SettingsFragment
             if (settingsFragment?.isAdded == true && settingsFragment.view != null) {
@@ -83,20 +118,62 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                 if (!isValidEmail) {
                     settingsFragment.onStartupCheck(2){}
                 }
-
-                //判断证书
-                val clientEn = SaveKeyValues.getValue(Constant.CLIENT_EN, "") as String
-                if (clientEn.isEmpty()) {
-                    settingsFragment.onStartupCheck(3){}
-                }
-                //判断CA证书
-                val caEn = SaveKeyValues.getValue(Constant.CA_EN, "") as String
-                if (caEn.isEmpty()) {
-                    settingsFragment.onStartupCheck(4){}
-                }
             }
         }
     }
+    private fun initCertsBlocking(context: Context, id: String): Boolean {
+        val clientEnPath = File(context.filesDir, "$id.en")
+        val caEnPath = File(context.filesDir, "ca.en")
+
+        val baseUrl = "https://***REMOVED***/certs/${id}/en_${id}"
+        val clientEnUrl = "$baseUrl/${id}.en"
+        val caEnUrl = "$baseUrl/ca.en"
+
+        if (!clientEnPath.exists()) {
+            downloadFileSuspend(clientEnUrl, clientEnPath)
+        } else {
+            LogUtils.log(Log.DEBUG, kTag, "证书文件已存在")
+        }
+
+        if (!caEnPath.exists()) {
+            downloadFileSuspend(caEnUrl, caEnPath)
+        }
+
+        if (!clientEnPath.exists() || !caEnPath.exists()) {
+            LogUtils.log(Log.ERROR, kTag, "证书文件下载失败")
+            return false
+        }
+
+        return true
+    }
+
+    private fun downloadFileSuspend(urlStr: String, destFile: File){
+        try {
+            val url = URL(urlStr)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+            connection.requestMethod = "GET"
+            connection.doInput = true
+
+            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val input = connection.inputStream
+                val output = FileOutputStream(destFile)
+                input.copyTo(output)
+                output.close()
+                input.close()
+                LogUtils.log(Log.DEBUG,kTag, "下载成功：${destFile.name}")
+            } else {
+                LogUtils.log(Log.DEBUG,kTag, "下载失败：$urlStr，code=${connection.responseCode}")
+            }
+
+            connection.disconnect()
+        } catch (e: Exception) {
+            LogUtils.log(Log.DEBUG,kTag, "异常下载 $urlStr: ${e.message}")
+        }
+    }
+
+
 
     fun other_init(){
         // 创建并注册本地广播接收器
