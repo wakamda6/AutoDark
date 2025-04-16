@@ -113,7 +113,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         val notifyFilter = IntentFilter(notifyAction)
         LocalBroadcastManager.getInstance(this).registerReceiver(notifyReceiver, notifyFilter)
 
-        startService(Intent(this, MqttService::class.java))
+//        startService(Intent(this, MqttService::class.java))
 
 //        //先设置邮箱
 //        binding.viewPager.post {
@@ -136,6 +136,9 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                 launch(Dispatchers.Main) {
                     showRetryDialog(this@MainActivity, id)
                 }
+            }else {
+                // 成功了，继续启动服务
+                startService(Intent(this@MainActivity, MqttService::class.java))
             }
         }
     }
@@ -156,6 +159,9 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                             launch(Dispatchers.Main) {
                                 showRetryDialog(this@MainActivity, id)
                             }
+                        }else {
+                            // 成功了，继续启动服务
+                            startService(Intent(this@MainActivity, MqttService::class.java))
                         }
                     }
                 }

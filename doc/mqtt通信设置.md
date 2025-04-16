@@ -4,6 +4,7 @@
 mosquitto_passwd -c /etc/mosquitto/pwfile.txt username
 //第二次添加不需要使用 -c 选项（它会创建一个新文件并覆盖现有文件）
 mosquitto_passwd /etc/mosquitto/pwfile.txt another_username
+systemctl restart mosquitto.service
 //删除
 mosquitto_passwd -D /etc/mosquitto/pwfile.txt another_username
 ```
