@@ -68,36 +68,36 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
         LogUtils.log(Log.DEBUG,kTag,"Fragment 创建，应用版本: ${com.autodark.BuildConfig.VERSION_NAME}")
     }
 
-    fun onStartupCheck(value:Int,onSuccess: (() -> Unit)? = null) {
-        if(value == 1){
-
-        }else if(value == 2){
-            //接收邮箱设置
-            AlertInputDialog.Builder()
-                .setContext(requireContext())
-                .setTitle("设置接收邮箱")
-                .setHintMessage("请输入接收邮箱")
-                .setNegativeButton("退出应用")
-                .setPositiveButton("确定")
-                .setOnDialogButtonClickListener(object : AlertInputDialog.OnDialogButtonClickListener {
-                    override fun onConfirmClick(value: String) {
-                        if (!TextUtils.isEmpty(value)) {
-                            LogUtils.log(Log.DEBUG, "SettingsFragment", "接收邮箱设置为: $value")
-                            SaveKeyValues.putValue(Constant.EMAIL_ADDRESS, value)
-                            binding.emailTextView.text = value
-                            onSuccess?.invoke()
-                        } else {
-                            "接收邮箱不能为空".show(requireContext())
-                            onStartupCheck(1,onSuccess) // 递归再次弹出
-                        }
-                    }
-
-                    override fun onCancelClick() {
-                        requireActivity().finishAffinity() // 退出整个应用
-                    }
-                }).build().show()
-        }
-    }
+//    fun onStartupCheck(value:Int,onSuccess: (() -> Unit)? = null) {
+//        if(value == 1){
+//
+//        }else if(value == 2){
+//            //接收邮箱设置
+//            AlertInputDialog.Builder()
+//                .setContext(requireContext())
+//                .setTitle("设置接收邮箱")
+//                .setHintMessage("请输入接收邮箱")
+//                .setNegativeButton("退出应用")
+//                .setPositiveButton("确定")
+//                .setOnDialogButtonClickListener(object : AlertInputDialog.OnDialogButtonClickListener {
+//                    override fun onConfirmClick(value: String) {
+//                        if (!TextUtils.isEmpty(value)) {
+//                            LogUtils.log(Log.DEBUG, "SettingsFragment", "接收邮箱设置为: $value")
+//                            SaveKeyValues.putValue(Constant.EMAIL_ADDRESS, value)
+//                            binding.emailTextView.text = value
+//                            onSuccess?.invoke()
+//                        } else {
+//                            "接收邮箱不能为空".show(requireContext())
+//                            onStartupCheck(1,onSuccess) // 递归再次弹出
+//                        }
+//                    }
+//
+//                    override fun onCancelClick() {
+//                        requireActivity().finishAffinity() // 退出整个应用
+//                    }
+//                }).build().show()
+//        }
+//    }
 
     override fun initEvent() {
         binding.sendEmailLayout.setOnClickListener{

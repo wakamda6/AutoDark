@@ -95,32 +95,53 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         binding.viewPager.adapter = fragmentAdapter
         binding.viewPager.offscreenPageLimit = fragmentPages.size  // 强制加载所有 Fragment
 
-        //判断证书是否存在
-        lifecycleScope.launch {
-            val success = ensureCertsReady(this@MainActivity, id)
-            if (success) {
-                // ✅ 证书已下载并准备好，继续后续逻辑
-                Log.d("MainActivity", "证书准备完成，继续执行后续操作")
-            } else {
-                // 如果用户取消，处理取消的情况
-                Log.d("MainActivity", "证书下载失败，操作取消")
-            }
-        }
+//        //先设置邮箱
+//        binding.viewPager.post {
+//            val settingsFragment = fragmentPages[0] as? SettingsFragment
+//            if (settingsFragment?.isAdded == true && settingsFragment.view != null) {
+//                // 判断邮箱是否已经填入
+//                val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
+//                val isValidEmail = emailAddress.isNotEmpty() && Patterns.EMAIL_ADDRESS.matcher(emailAddress).matches()
+//                if (!isValidEmail) {
+//                    settingsFragment.onStartupCheck(2){}
+//                }
+//            }
+//        }
 
-
-        //设置邮箱
-        binding.viewPager.post {
-            val settingsFragment = fragmentPages[0] as? SettingsFragment
-            if (settingsFragment?.isAdded == true && settingsFragment.view != null) {
-                // 判断邮箱是否已经填入
-                val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
-                val isValidEmail = emailAddress.isNotEmpty() && Patterns.EMAIL_ADDRESS.matcher(emailAddress).matches()
-                if (!isValidEmail) {
-                    settingsFragment.onStartupCheck(2){}
+        //判断证书是否存在，因为涉及文件下载，安卓强制非阻塞
+        lifecycleScope.launch(Dispatchers.IO) {
+            val success = initCertsBlocking(this@MainActivity, id)
+            if (!success) {
+                // 回到主线程再弹窗
+                launch(Dispatchers.Main) {
+                    showRetryDialog(this@MainActivity, id)
                 }
             }
         }
     }
+
+    private fun showRetryDialog(context: Context, id: String) {
+        AlertMessageDialog.Builder()
+            .setContext(this)
+            .setTitle("证书文件下载失败")
+            .setMessage("请将页面截图发送给开发者后重试\nID: $id")
+            .setPositiveButton("重试")
+            .setOnDialogButtonClickListener(object :
+                AlertMessageDialog.OnDialogButtonClickListener {
+                override fun onConfirmClick() {
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        val success = initCertsBlocking(this@MainActivity, id)
+                        if (!success) {
+                            // 回到主线程再弹窗
+                            launch(Dispatchers.Main) {
+                                showRetryDialog(this@MainActivity, id)
+                            }
+                        }
+                    }
+                }
+            }).build().show()
+    }
+
     private fun initCertsBlocking(context: Context, id: String): Boolean {
         val clientEnPath = File(context.filesDir, "$id.en")
         val caEnPath = File(context.filesDir, "ca.en")
