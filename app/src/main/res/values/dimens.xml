@@ -44,7 +44,7 @@
     <dimen name="titleViewHeight">45dp</dimen>
 
     <!--普通列表Item Layout高度-->
-    <dimen name="itemLayoutHeight">56dp</dimen>
+    <dimen name="itemLayoutHeight">65dp</dimen>
 
     <!--png图标大小-->
     <dimen name="pngSize" tools:ignore="PxUsage">80px</dimen>

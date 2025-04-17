@@ -91,31 +91,31 @@
             android:layout_marginHorizontal="@dimen/dp_10"
             android:background="#CCC" />
 
-        <RelativeLayout
-            android:id="@+id/emailTitleLayout"
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/itemLayoutHeight"
-            android:background="@color/white"
-            android:paddingHorizontal="10dp">
+<!--        <RelativeLayout-->
+<!--            android:id="@+id/emailTitleLayout"-->
+<!--            android:layout_width="match_parent"-->
+<!--            android:layout_height="@dimen/itemLayoutHeight"-->
+<!--            android:background="@color/white"-->
+<!--            android:paddingHorizontal="10dp">-->
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerVertical="true"
-                android:gravity="center_vertical"
-                android:text="邮件标题"
-                android:textColor="@color/colorText"
-                android:textSize="@dimen/sp_16" />
+<!--            <TextView-->
+<!--                android:layout_width="wrap_content"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:layout_centerVertical="true"-->
+<!--                android:gravity="center_vertical"-->
+<!--                android:text="邮件标题"-->
+<!--                android:textColor="@color/colorText"-->
+<!--                android:textSize="@dimen/sp_16" />-->
 
-            <TextView
-                android:id="@+id/emailTitleView"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:gravity="center_vertical"
-                android:textSize="@dimen/sp_16" />
-        </RelativeLayout>
+<!--            <TextView-->
+<!--                android:id="@+id/emailTitleView"-->
+<!--                android:layout_width="wrap_content"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:layout_alignParentEnd="true"-->
+<!--                android:layout_centerVertical="true"-->
+<!--                android:gravity="center_vertical"-->
+<!--                android:textSize="@dimen/sp_16" />-->
+<!--        </RelativeLayout>-->
 
         <View
             android:layout_width="match_parent"
@@ -155,31 +155,31 @@
             android:layout_marginHorizontal="@dimen/dp_10"
             android:background="#CCC" />
 
-        <RelativeLayout
-            android:id="@+id/keyLayout"
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/itemLayoutHeight"
-            android:background="@color/white"
-            android:paddingHorizontal="10dp">
+<!--        <RelativeLayout-->
+<!--            android:id="@+id/keyLayout"-->
+<!--            android:layout_width="match_parent"-->
+<!--            android:layout_height="@dimen/itemLayoutHeight"-->
+<!--            android:background="@color/white"-->
+<!--            android:paddingHorizontal="10dp">-->
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerVertical="true"
-                android:gravity="center_vertical"
-                android:text="打卡口令"
-                android:textColor="@color/colorText"
-                android:textSize="@dimen/sp_16" />
+<!--            <TextView-->
+<!--                android:layout_width="wrap_content"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:layout_centerVertical="true"-->
+<!--                android:gravity="center_vertical"-->
+<!--                android:text="打卡口令"-->
+<!--                android:textColor="@color/colorText"-->
+<!--                android:textSize="@dimen/sp_16" />-->
 
-            <TextView
-                android:id="@+id/keyTextView"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:gravity="center_vertical"
-                android:textSize="@dimen/sp_16" />
-        </RelativeLayout>
+<!--            <TextView-->
+<!--                android:id="@+id/keyTextView"-->
+<!--                android:layout_width="wrap_content"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:layout_alignParentEnd="true"-->
+<!--                android:layout_centerVertical="true"-->
+<!--                android:gravity="center_vertical"-->
+<!--                android:textSize="@dimen/sp_16" />-->
+<!--        </RelativeLayout>-->
 
         <View
             android:layout_width="match_parent"
@@ -205,6 +205,8 @@
                 android:layout_height="wrap_content"
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
+                android:minWidth="48dp"
+                android:minHeight="48dp"
                 android:thumb="@drawable/select_switch_circle"
                 android:track="@drawable/select_switch_background"
                 tools:ignore="UseSwitchCompatOrMaterialXml" />
@@ -242,6 +244,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="end"
+                    android:minWidth="48dp"
+                    android:minHeight="48dp"
                     android:thumb="@drawable/select_switch_circle"
                     android:track="@drawable/select_switch_background"
                     tools:ignore="UseSwitchCompatOrMaterialXml" />
@@ -283,6 +287,8 @@
                 android:layout_height="wrap_content"
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
+                android:minWidth="48dp"
+                android:minHeight="48dp"
                 android:thumb="@drawable/select_switch_circle"
                 android:track="@drawable/select_switch_background"
                 tools:ignore="UseSwitchCompatOrMaterialXml" />
@@ -323,6 +329,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="end"
+                    android:minWidth="48dp"
+                    android:minHeight="48dp"
                     android:thumb="@drawable/select_switch_circle"
                     android:track="@drawable/select_switch_background"
                     tools:ignore="UseSwitchCompatOrMaterialXml" />
