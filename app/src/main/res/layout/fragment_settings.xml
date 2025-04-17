@@ -464,5 +464,21 @@
                 android:textColor="@color/colorText"
                 android:textSize="@dimen/sp_16" />
         </RelativeLayout>
+
+        <RelativeLayout
+            android:id="@+id/idCodeLayout"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/itemLayoutHeight"
+            android:background="@color/white"
+            android:paddingHorizontal="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:text="二维码"
+                android:textColor="@color/colorText"
+                android:textSize="@dimen/sp_16" />
+        </RelativeLayout>
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

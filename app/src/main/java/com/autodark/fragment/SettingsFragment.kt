@@ -1,11 +1,13 @@
 package com.autodark.fragment
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -13,10 +15,6 @@ import android.os.Handler
 import android.os.Message
 import android.provider.Settings
 import android.text.TextUtils
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.view.WindowManager
 import com.autodark.R
 import com.autodark.databinding.FragmentSettingsBinding
 import com.autodark.service.FloatingWindowService
@@ -34,10 +32,16 @@ import com.pengxh.kt.lite.widget.dialog.AlertInputDialog
 import com.pengxh.kt.lite.widget.dialog.BottomActionSheet
 import com.autodark.utils.LogUtils
 import android.util.Log
+import android.view.*
+import android.widget.ImageView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import com.autodark.BaseApplication
 import com.autodark.extensions.*
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.MultiFormatWriter
+import com.google.zxing.common.BitMatrix
+import com.journeyapps.barcodescanner.BarcodeEncoder
 import com.pengxh.kt.lite.extensions.show
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -48,6 +52,8 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
     private val kTag = "SettingsFragment"
 
     var topicMessageToSend:String = ""
+
+    var id:String = ""
 
     companion object {
         var weakReferenceHandler: WeakReferenceHandler? = null
@@ -315,6 +321,56 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
             LogUtils.log(Log.DEBUG,kTag, "问答介绍布局被点击")
             requireContext().navigatePageTo<QuestionAndAnswerActivity>()
         }
+
+        binding.idCodeLayout.setOnClickListener {
+            LogUtils.log(Log.DEBUG,kTag, "二维码被点击")
+            // 要显示为二维码的字符串
+            val app = requireActivity().application as BaseApplication
+            val stringToEncode = app.androidId
+
+            // 生成二维码
+            val bitmap = generateQRCode(stringToEncode)
+
+            // 设置二维码到 ImageView
+            showQRCodeDialog(bitmap)
+        }
+    }
+
+    private fun showQRCodeDialog(bitmap: Bitmap?) {
+        // 如果二维码生成成功
+        if (bitmap != null) {
+            // 使用 AlertDialog 创建弹窗
+            val builder = AlertDialog.Builder(requireContext())
+
+            // 获取布局并设置二维码图片
+            val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_qrcode, null)
+            val imageView = dialogView.findViewById<ImageView>(R.id.qrCodeImageView)
+            imageView.setImageBitmap(bitmap)
+
+            val dialog = builder.setView(dialogView)
+                .setPositiveButton("确定") { dialog, _ ->
+                    dialog.dismiss()  // 关闭弹窗
+                }
+                .setCancelable(true) // 点击外部区域也可以关闭对话框
+                .create()
+
+            // 设置窗口居中显示
+            dialog.window?.setGravity(Gravity.CENTER)  // 设置弹窗在屏幕正中心
+            dialog.show()
+        }
+    }
+
+
+    private fun generateQRCode(data: String): Bitmap? {
+        try {
+            val multiFormatWriter = MultiFormatWriter()
+            val bitMatrix: BitMatrix = multiFormatWriter.encode(data, BarcodeFormat.QR_CODE, 400, 400) // 设置二维码的尺寸
+            val barcodeEncoder = BarcodeEncoder()
+            return barcodeEncoder.createBitmap(bitMatrix)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return null
     }
 
     private fun isNotificationListenerEnabled(context: Context): Boolean {

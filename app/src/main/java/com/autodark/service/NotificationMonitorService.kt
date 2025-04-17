@@ -80,7 +80,7 @@ import java.util.UUID
         // 获取接收消息APP的包名
         val packageName = sbn.packageName
         // 获取接收消息的标题
-        val title = extras.getString(Notification.EXTRA_TITLE) ?: ""
+        val title = extras.getString(Notification.EXTRA_TITLE)
         // 获取接收消息的内容
         val notice = extras.getString(Notification.EXTRA_TEXT)
 
