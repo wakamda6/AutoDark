@@ -11,8 +11,8 @@ android {
         applicationId "com.autodark"
         minSdkVersion 24
         targetSdkVersion 33
-        versionCode 2002
-        versionName "2.0.0.2"
+        versionCode 2012
+        versionName "2.0.1.2"
         flavorDimensions "versionCode"
     }
 
@@ -36,8 +36,8 @@ android {
     productFlavors {
         auto {
 //            debug
-            applicationId "com.autodark"
-//            applicationId = id
+//            applicationId "com.autodark"
+            applicationId = id
         }
     }
     packagingOptions {

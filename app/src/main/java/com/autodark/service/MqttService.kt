@@ -25,6 +25,7 @@ import com.pengxh.kt.lite.utils.WeakReferenceHandler
 import android.content.Context
 import android.content.res.Resources
 import com.autodark.BaseApplication
+import com.autodark.utils.LogUtils.otherShow
 import java.io.*
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
@@ -66,8 +67,6 @@ class MqttService : Service(), Handler.Callback {
         return true
     }
 
-
-
     //网络相关
     private lateinit var connectivityManager: ConnectivityManager
     private lateinit var networkCallback: ConnectivityManager.NetworkCallback
@@ -75,9 +74,7 @@ class MqttService : Service(), Handler.Callback {
 
     //广播器设置
     private lateinit var receiver: BroadcastReceiver
-//    private val mqttTopicAction = "com.example.MQTT_PUBLISH_DARK_TOPIC"
     val mqttPushAction = "com.example.MQTT_PUBLISH_DARK_RESULT"
-
 
     override fun onCreate() {
         id = (applicationContext as BaseApplication).androidId
@@ -116,8 +113,6 @@ class MqttService : Service(), Handler.Callback {
         val notification = notificationBuilder?.build()
         startForeground(notificationId, notification)
 
-
-
         // 创建并注册本地广播接收器
         receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -149,6 +144,7 @@ class MqttService : Service(), Handler.Callback {
 
             override fun onLost(network: Network) {
                 // 网络丢失时可以选择执行其他操作
+                "网络异常".otherShow(this@MqttService)
             }
         }
         // 注册网络回调
@@ -198,6 +194,7 @@ class MqttService : Service(), Handler.Callback {
         if (!NetworkUtils.isNetworkAvailable(this)) {
             LogUtils.log(Log.WARN,kTag, "网络不可用，无法连接到 MQTT 代理")
             isConnecting = false
+            "网络异常".otherShow(this@MqttService)
             return
         }
 
@@ -223,8 +220,9 @@ class MqttService : Service(), Handler.Callback {
             aesDecryptInMemory(inputStream, key)
         }
         if (p12Bytes.isEmpty()) {
-            LogUtils.log(Log.ERROR, kTag, "解密 CA 文件失败")
+            LogUtils.log(Log.ERROR, kTag, "解密证书文件失败")
             // 处理解密失败的情况，比如返回或终止操作
+            "解密证书文件失败".otherShow(this@MqttService)
             return
         }
         val caBytes = FileInputStream(encryptedCaFile).use { inputStream ->
@@ -233,6 +231,7 @@ class MqttService : Service(), Handler.Callback {
         if (caBytes.isEmpty()) {
             LogUtils.log(Log.ERROR, kTag, "解密 CA 文件失败")
             // 处理解密失败的情况，比如返回或终止操作
+            "解密 CA 文件失败".otherShow(this@MqttService)
             return
         }
 
@@ -306,6 +305,8 @@ class MqttService : Service(), Handler.Callback {
                     val topicsToSubscribe = arrayOf(mqttTopicCheckAppAlive,mqttTopicDark)
                     val qosLevels = intArrayOf(1,1) // QoS 级别
                     subscribeToTopics(topicsToSubscribe, qosLevels) // 连接成功后订阅主题
+
+                    "Mqtt主题订阅成功".otherShow(this@MqttService)
                 }
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
@@ -321,6 +322,7 @@ class MqttService : Service(), Handler.Callback {
                         // 其他异常类型
                         LogUtils.log(Log.ERROR, kTag, "未知错误: ${exception?.message}")
                     }
+                    "mqtt通信失败".otherShow(this@MqttService)
                     isConnecting = false
                 }
             })
@@ -341,6 +343,7 @@ class MqttService : Service(), Handler.Callback {
                     LogUtils.log(Log.ERROR, kTag, "MQTT 连接断开，原因未知")
                 }
                 isConnecting = true
+                "mqtt连接丢失".otherShow(this@MqttService)
             }
 
             override fun connectComplete(reconnect: Boolean, serverURI: String?) {
@@ -451,13 +454,12 @@ class MqttService : Service(), Handler.Callback {
         } catch (e: MqttException) {
             LogUtils.log(Log.ERROR,kTag, "消息发布失败: ${e.message}")
         }
+        "mqtt发布消息成功".otherShow(this@MqttService)
     }
 
     fun publishMqttDarkResult(message: String, qos: Int = 1) {
         publishMessage(mqttTopicDarkResult,message,qos)
     }
-
-
 
     // 计算字符串的SHA-256哈希
     private fun hashString(input: String): ByteArray {
@@ -502,22 +504,6 @@ class MqttService : Service(), Handler.Callback {
             val secretKey = SecretKeySpec(key, "AES")
             cipher.init(Cipher.DECRYPT_MODE, secretKey, ivSpec)
 
-            // 解密文件内容并将其保存到内存中
-//            val cipherInputStream = CipherInputStream(inputStream, cipher)
-//            val byteArrayOutputStream = ByteArrayOutputStream()
-//
-//            var buffer = ByteArray(4096)
-//            var bytesReadInLoop: Int
-//            while (cipherInputStream.read(buffer).also { bytesReadInLoop = it } != -1) {
-//                byteArrayOutputStream.write(buffer, 0, bytesReadInLoop)
-//            }
-//
-//            cipherInputStream.close()
-//            byteArrayOutputStream.close()
-//
-//            // 返回解密后的字节数组
-//            return byteArrayOutputStream.toByteArray()
-
             CipherInputStream(inputStream, cipher).use { cipherInputStream ->
                 ByteArrayOutputStream().use { outputStream ->
                     val buffer = ByteArray(4096)
@@ -536,14 +522,6 @@ class MqttService : Service(), Handler.Callback {
         // 出现任何错误时返回空字节数组
         return ByteArray(0)
     }
-
-
-//    private fun sendBroadcast(message: String) {
-//        LogUtils.log(Log.DEBUG,kTag, "发送本机mqtt主题到Main activity:$message")
-//        val intent = Intent(mqttTopicAction)
-//        intent.putExtra("message", message)
-//        LocalBroadcastManager.getInstance(this).sendBroadcast(intent) // 发送本地广播
-//    }
 
     override fun onDestroy() {
         super.onDestroy()

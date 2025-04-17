@@ -35,6 +35,8 @@ import android.util.Log
 import androidx.lifecycle.lifecycleScope
 import com.autodark.BaseApplication
 import com.autodark.extensions.*
+import com.autodark.utils.LogUtils.otherShow
+import com.pengxh.kt.lite.extensions.show
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -75,32 +77,32 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
     }
 
     override fun initEvent() {
-        binding.sendEmailLayout.setOnClickListener{
-            LogUtils.log(Log.DEBUG,kTag,"发送邮箱布局点击事件触发")
-            AlertInputDialog.Builder()
-                .setContext(requireContext())
-                .setTitle("设置发送邮箱")
-                .setHintMessage("请输入发送邮箱")
-                .setNegativeButton("取消")
-                .setPositiveButton("确定")
-                .setOnDialogButtonClickListener(object :
-                    AlertInputDialog.OnDialogButtonClickListener {
-                    override fun onConfirmClick(value: String) {
-                        if (!TextUtils.isEmpty(value)) {
-                            LogUtils.log(Log.DEBUG,kTag,"发送邮箱设置为: $value")
-                            SaveKeyValues.putValue(Constant.EMAIL_ADDRESS, value)
-                            binding.emailTextView.text = value
-                        } else {
-                            LogUtils.log(Log.DEBUG,kTag,"发送邮箱输入为空")
-                            "什么都还没输入呢！".show(requireContext())
-                        }
-                    }
-
-                    override fun onCancelClick() {
-                        LogUtils.log(Log.DEBUG,kTag,"发送邮箱设置取消")
-                    }
-                }).build().show()
-        }
+//        binding.sendEmailLayout.setOnClickListener{
+//            LogUtils.log(Log.DEBUG,kTag,"发送邮箱布局点击事件触发")
+//            AlertInputDialog.Builder()
+//                .setContext(requireContext())
+//                .setTitle("设置发送邮箱")
+//                .setHintMessage("请输入发送邮箱")
+//                .setNegativeButton("取消")
+//                .setPositiveButton("确定")
+//                .setOnDialogButtonClickListener(object :
+//                    AlertInputDialog.OnDialogButtonClickListener {
+//                    override fun onConfirmClick(value: String) {
+//                        if (!TextUtils.isEmpty(value)) {
+//                            LogUtils.log(Log.DEBUG,kTag,"发送邮箱设置为: $value")
+//                            SaveKeyValues.putValue(Constant.EMAIL_ADDRESS, value)
+//                            binding.emailTextView.text = value
+//                        } else {
+//                            LogUtils.log(Log.DEBUG,kTag,"发送邮箱输入为空")
+//                            "什么都还没输入呢！".show(requireContext())
+//                        }
+//                    }
+//
+//                    override fun onCancelClick() {
+//                        LogUtils.log(Log.DEBUG,kTag,"发送邮箱设置取消")
+//                    }
+//                }).build().show()
+//        }
 
         binding.emailLayout.setOnClickListener {
             LogUtils.log(Log.DEBUG,kTag,"接收邮箱布局点击事件触发")

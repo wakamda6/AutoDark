@@ -20,6 +20,7 @@ import com.autodark.adapter.BaseFragmentAdapter
 import com.autodark.extensions.initImmersionBar
 import com.autodark.service.MqttService
 import com.autodark.utils.LogUtils
+import com.autodark.utils.LogUtils.otherShow
 import com.pengxh.kt.lite.widget.dialog.AlertMessageDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -113,6 +114,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     showRetryDialog(this@MainActivity, id)
                 }
             }else {
+                "CA证书获取成功".otherShow(this@MainActivity)
                 // 成功了，继续启动服务
                 startService(Intent(this@MainActivity, MqttService::class.java))
             }
@@ -136,6 +138,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                                 showRetryDialog(context, id)
                             }
                         }else {
+                            "CA证书获取成功".show(this@MainActivity)
                             // 成功了，继续启动服务
                             startService(Intent(context, MqttService::class.java))
                         }

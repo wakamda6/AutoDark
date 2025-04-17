@@ -1,12 +1,13 @@
 package com.autodark.utils
 
-import android.Manifest
-import android.app.Activity
 import android.content.Context
-import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import org.eclipse.paho.client.mqttv3.IMqttActionListener
 import java.io.File
 import java.io.FileWriter
 import java.io.IOException
@@ -52,5 +53,12 @@ object LogUtils {
             Log.e(LOG_TAG, "无法写入日志文件: ${e.message}")
         }
     }
+
+    fun String.otherShow(context: Context) {
+        ContextCompat.getMainExecutor(context).execute {
+            Toast.makeText(context, this, Toast.LENGTH_SHORT).show()
+        }
+    }
+
 }
 
