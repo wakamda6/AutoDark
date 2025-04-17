@@ -119,16 +119,34 @@ import java.util.UUID
                     backToMainActivity()
                 }
                 // 发送打卡成功的邮件
-                lifecycleScope.launch(Dispatchers.Main) {
-                    "即将发送通知邮件，请注意查收".show(this@NotificationMonitorService)
-                    withContext(Dispatchers.IO) {
-                        val subject = SaveKeyValues.getValue(
-                            Constant.EMAIL_TITLE, "打卡结果通知"
-                        ) as String
-                        notice.createTextMail(subject, emailAddress).sendTextMail()
-                        LogUtils.log(Log.DEBUG,kTag, "邮件发送成功")
+                // 在 SharedPreferences 中保存是否已经发送
+                val hasSentKey = "has_sent_email"
+                val isSentRecently = SaveKeyValues.getValue(hasSentKey, false) as Boolean
+
+                if (!isSentRecently) {
+                    lifecycleScope.launch(Dispatchers.Main) {
+                        "即将发送通知邮件，请注意查收".show(this@NotificationMonitorService)
+                        withContext(Dispatchers.IO) {
+                            val subject = SaveKeyValues.getValue(
+                                Constant.EMAIL_TITLE, "打卡结果通知"
+                            ) as String
+                            notice.createTextMail(subject, emailAddress).sendTextMail()
+                            LogUtils.log(Log.DEBUG, kTag, "邮件发送成功")
+
+                            // 更新标志位，表示已经发送邮件
+                            SaveKeyValues.putValue(hasSentKey, true)
+
+                            // 设置冷却时间，例如 1 秒后可以再次发送
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                delay(1000L)  // 延迟 1 秒
+                                SaveKeyValues.putValue(hasSentKey, false)
+                            }
+                        }
                     }
+                } else {
+                    LogUtils.log(Log.DEBUG, kTag, "邮件发送冷却中，跳过发送")
                 }
+
 
                 //通过mqtt发送通知内容
                 val notification = "dark_success:$title: $notice"

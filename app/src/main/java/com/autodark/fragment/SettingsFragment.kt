@@ -1,6 +1,8 @@
 package com.autodark.fragment
 
+import android.app.Activity
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
@@ -32,10 +34,10 @@ import com.pengxh.kt.lite.widget.dialog.AlertInputDialog
 import com.pengxh.kt.lite.widget.dialog.BottomActionSheet
 import com.autodark.utils.LogUtils
 import android.util.Log
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import com.autodark.BaseApplication
 import com.autodark.extensions.*
-import com.autodark.utils.LogUtils.otherShow
 import com.pengxh.kt.lite.extensions.show
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -52,6 +54,22 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
     }
 
     private val timeArray = arrayListOf("15s", "30s", "45s", "60s")
+
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            binding.noticeSwitch.isChecked = isNotificationListenerEnabled(requireContext())
+        }
+
+    private val requestOverlayPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                // 权限请求成功的逻辑
+                LogUtils.log(Log.DEBUG, kTag, "悬浮窗权限已授予")
+            } else {
+                // 权限请求失败的逻辑
+                LogUtils.log(Log.DEBUG, kTag, "悬浮窗权限未授予")
+            }
+        }
 
     override fun setupTopBarLayout() {
         LogUtils.log(Log.DEBUG,kTag, "顶部栏布局设置完成")
@@ -216,29 +234,39 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
 //        }
 
         binding.floatSwitch.setOnClickListener {
-            LogUtils.log(Log.DEBUG,kTag, "悬浮开关被点击，当前状态: ${binding.floatSwitch.isChecked}")
+            LogUtils.log(Log.DEBUG, kTag, "悬浮开关被点击，当前状态: ${binding.floatSwitch.isChecked}")
             val sdkInt = Build.VERSION.SDK_INT
             if (sdkInt >= Build.VERSION_CODES.M) {
                 if (sdkInt >= Build.VERSION_CODES.O) {
-                    LogUtils.log(Log.DEBUG,kTag, "请求悬浮窗权限")
+                    LogUtils.log(Log.DEBUG, kTag, "请求悬浮窗权限")
                     val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-                    startActivityForResult(intent, 101)
+                    requestOverlayPermissionLauncher.launch(intent)
                 } else {
-                    LogUtils.log(Log.DEBUG,kTag, "请求悬浮窗权限（6.0以下）")
+                    LogUtils.log(Log.DEBUG, kTag, "请求悬浮窗权限（6.0以下）")
                     val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
                     intent.data = Uri.parse("package:${requireContext().packageName}")
-                    startActivityForResult(intent, 101)
+                    requestOverlayPermissionLauncher.launch(intent)
                 }
             } else {
-                LogUtils.log(Log.DEBUG,kTag, "手机系统版本太低，无法请求权限")
+                LogUtils.log(Log.DEBUG, kTag, "手机系统版本太低，无法请求权限")
                 "手机系统版本太低".show(requireContext())
             }
         }
 
-        binding.noticeSwitch.setOnClickListener {
-            LogUtils.log(Log.DEBUG,kTag, "通知开关被点击")
-            startActivityForResult(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS), 100)
+        binding.noticeSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                if (!isNotificationListenerEnabled(requireContext())) {
+                    // 暂时先取消勾选，授权成功后再设为 true
+                    binding.noticeSwitch.isChecked = false
+
+                    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                    notificationPermissionLauncher.launch(intent)
+                }
+            } else {
+                // 关闭开关时的其他处理（可选）
+            }
         }
+
 
         binding.openTestLayout.setOnClickListener {
             LogUtils.log(Log.DEBUG,kTag, "打开测试布局被点击")
@@ -287,6 +315,12 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
             LogUtils.log(Log.DEBUG,kTag, "问答介绍布局被点击")
             requireContext().navigatePageTo<QuestionAndAnswerActivity>()
         }
+    }
+
+    private fun isNotificationListenerEnabled(context: Context): Boolean {
+        val cn = ComponentName(context, NotificationMonitorService::class.java)
+        val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+        return flat?.contains(cn.flattenToString()) == true
     }
 
 
