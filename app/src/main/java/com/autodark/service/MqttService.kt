@@ -70,7 +70,6 @@ class MqttService : Service(), Handler.Callback {
     //网络相关
     private lateinit var connectivityManager: ConnectivityManager
     private lateinit var networkCallback: ConnectivityManager.NetworkCallback
-    var isConnecting = false
 
     //广播器设置
     private lateinit var receiver: BroadcastReceiver
@@ -134,12 +133,6 @@ class MqttService : Service(), Handler.Callback {
         networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 LogUtils.log(Log.DEBUG,kTag, "网络连接可用")
-
-                // 检查 MQTT 客户端是否已连接
-                if (!isMqttConnected() && !isConnecting){
-                    LogUtils.log(Log.DEBUG,kTag, "MQTT连接中")
-                    connectToMqtt()
-                }
             }
 
             override fun onLost(network: Network) {
@@ -149,6 +142,8 @@ class MqttService : Service(), Handler.Callback {
         }
         // 注册网络回调
         connectivityManager.registerDefaultNetworkCallback(networkCallback)
+
+        connectToMqtt()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -183,17 +178,9 @@ class MqttService : Service(), Handler.Callback {
         lateinit var encryptedP12File: File
         lateinit var encryptedCaFile: File
 
-        if (isMqttConnected() || isConnecting) {
-            LogUtils.log(Log.WARN,kTag, "已经连接或正在连接中，取消连接请求")
-            return
-        }
-
-        isConnecting = true
-
         // 确保网络连接
         if (!NetworkUtils.isNetworkAvailable(this)) {
             LogUtils.log(Log.WARN,kTag, "网络不可用，无法连接到 MQTT 代理")
-            isConnecting = false
             "网络异常".otherShow(this@MqttService)
             return
         }
@@ -300,7 +287,6 @@ class MqttService : Service(), Handler.Callback {
             mqttClient.connect(options, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
                     LogUtils.log(Log.DEBUG,kTag, "$mqttServerUrl 连接成功")
-                    isConnecting = false
 
                     val topicsToSubscribe = arrayOf(mqttTopicCheckAppAlive,mqttTopicDark)
                     val qosLevels = intArrayOf(1,1) // QoS 级别
@@ -323,12 +309,10 @@ class MqttService : Service(), Handler.Callback {
                         LogUtils.log(Log.ERROR, kTag, "未知错误: ${exception?.message}")
                     }
                     "mqtt通信失败".otherShow(this@MqttService)
-                    isConnecting = false
                 }
             })
         } catch (e: MqttException) {
             LogUtils.log(Log.ERROR,kTag, "MQTT 连接异常: ${e.message}")
-            isConnecting = false
         }
 
         mqttClient.setCallback(object : MqttCallbackExtended {
@@ -342,17 +326,16 @@ class MqttService : Service(), Handler.Callback {
                 } else {
                     LogUtils.log(Log.ERROR, kTag, "MQTT 连接断开，原因未知")
                 }
-                isConnecting = true
-                "mqtt连接丢失".otherShow(this@MqttService)
             }
 
             override fun connectComplete(reconnect: Boolean, serverURI: String?) {
                 if (reconnect) {
                     LogUtils.log(Log.INFO, kTag, "重连成功")
+                    "mqtt重连成功".otherShow(this@MqttService)
                 } else {
                     LogUtils.log(Log.INFO, kTag, "初次连接成功")
+                    return
                 }
-                isConnecting = false
 
                 val topicsToSubscribe = arrayOf(mqttTopicCheckAppAlive,mqttTopicDark)
                 val qosLevels = intArrayOf(1,1) // QoS 级别
@@ -385,17 +368,6 @@ class MqttService : Service(), Handler.Callback {
             }
         })
     }
-
-    fun isMqttConnected(): Boolean {
-        return if (::mqttClient.isInitialized) {
-            val isConnected = mqttClient.isConnected
-            LogUtils.log(Log.DEBUG, kTag, "MQTT状态已连接")
-            isConnected
-        } else {
-            false
-        }
-    }
-
 
     //mqtt订阅
     private fun subscribeToTopics(topics: Array<String>, qos: IntArray) {
