@@ -17,9 +17,6 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import com.autodark.R
 import com.autodark.databinding.FragmentSettingsBinding
-import com.autodark.extensions.initImmersionBar
-import com.autodark.extensions.notificationEnable
-import com.autodark.extensions.show
 import com.autodark.service.FloatingWindowService
 import com.autodark.service.NotificationMonitorService
 import com.autodark.ui.NoticeRecordActivity
@@ -35,11 +32,18 @@ import com.pengxh.kt.lite.widget.dialog.AlertInputDialog
 import com.pengxh.kt.lite.widget.dialog.BottomActionSheet
 import com.autodark.utils.LogUtils
 import android.util.Log
+import androidx.lifecycle.lifecycleScope
+import com.autodark.BaseApplication
+import com.autodark.extensions.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 
 class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.Callback {
 
     private val kTag = "SettingsFragment"
+
+    var topicMessageToSend:String = ""
 
     companion object {
         var weakReferenceHandler: WeakReferenceHandler? = null
@@ -66,38 +70,9 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
         weakReferenceHandler = WeakReferenceHandler(this)
         binding.appVersion.text = com.autodark.BuildConfig.VERSION_NAME
         LogUtils.log(Log.DEBUG,kTag,"Fragment 创建，应用版本: ${com.autodark.BuildConfig.VERSION_NAME}")
+        val app = requireActivity().application as BaseApplication
+        topicMessageToSend = app.topicMessageToSend
     }
-
-//    fun onStartupCheck(value:Int,onSuccess: (() -> Unit)? = null) {
-//        if(value == 1){
-//
-//        }else if(value == 2){
-//            //接收邮箱设置
-//            AlertInputDialog.Builder()
-//                .setContext(requireContext())
-//                .setTitle("设置接收邮箱")
-//                .setHintMessage("请输入接收邮箱")
-//                .setNegativeButton("退出应用")
-//                .setPositiveButton("确定")
-//                .setOnDialogButtonClickListener(object : AlertInputDialog.OnDialogButtonClickListener {
-//                    override fun onConfirmClick(value: String) {
-//                        if (!TextUtils.isEmpty(value)) {
-//                            LogUtils.log(Log.DEBUG, "SettingsFragment", "接收邮箱设置为: $value")
-//                            SaveKeyValues.putValue(Constant.EMAIL_ADDRESS, value)
-//                            binding.emailTextView.text = value
-//                            onSuccess?.invoke()
-//                        } else {
-//                            "接收邮箱不能为空".show(requireContext())
-//                            onStartupCheck(1,onSuccess) // 递归再次弹出
-//                        }
-//                    }
-//
-//                    override fun onCancelClick() {
-//                        requireActivity().finishAffinity() // 退出整个应用
-//                    }
-//                }).build().show()
-//        }
-//    }
 
     override fun initEvent() {
         binding.sendEmailLayout.setOnClickListener{
@@ -142,6 +117,14 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
                             LogUtils.log(Log.DEBUG,kTag,"接收邮箱设置为: $value")
                             SaveKeyValues.putValue(Constant.EMAIL_ADDRESS, value)
                             binding.emailTextView.text = value
+
+                            //发送订阅主题
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                topicMessageToSend.createTextMail(
+                                    "控制手机需要订阅的主题", value
+                                )?.sendTextMail()
+                                LogUtils.log(Log.DEBUG, kTag, "发送主题成功")
+                            }
                         } else {
                             LogUtils.log(Log.DEBUG,kTag,"接收邮箱输入为空")
                             "什么都还没输入呢！".show(requireContext())

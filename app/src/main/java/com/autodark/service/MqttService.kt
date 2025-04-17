@@ -24,7 +24,6 @@ import com.pengxh.kt.lite.extensions.timestampToCompleteDate
 import com.pengxh.kt.lite.utils.WeakReferenceHandler
 import android.content.Context
 import android.content.res.Resources
-import android.provider.Settings
 import com.autodark.BaseApplication
 import java.io.*
 import javax.net.ssl.SSLContext
@@ -44,6 +43,16 @@ import javax.net.ssl.*
 class MqttService : Service(), Handler.Callback {
 
     var id:String = ""
+    private lateinit var mqttServerUrl: String
+    private lateinit var mqttClientId: String
+    private lateinit var user: String
+    private lateinit var pwd: String
+    private lateinit var mqttClient: MqttAndroidClient
+    private lateinit var mqttTopicCheckAppAlive: String
+    private lateinit var mqttTopicCheckAppAliveResult: String
+    private lateinit var mqttTopicDark: String
+    private lateinit var mqttTopicDarkResult: String
+    private lateinit var mqttTopicLastWill: String
 
     private val kTag = "MqttService"
     private val notificationId = 1
@@ -57,17 +66,7 @@ class MqttService : Service(), Handler.Callback {
         return true
     }
 
-    //mqtt设置
-    private lateinit var mqttServerUrl: String
-    private lateinit var mqttClientId: String
-    private lateinit var user: String
-    private lateinit var pwd: String
-    private lateinit var mqttClient: MqttAndroidClient
-    private lateinit var mqttTopicCheckAppAlive: String
-    private lateinit var mqttTopicCheckAppAliveResult: String
-    private lateinit var mqttTopicDark: String
-    private lateinit var mqttTopicDarkResult: String
-    private lateinit var mqttTopicLastWill: String
+
 
     //网络相关
     private lateinit var connectivityManager: ConnectivityManager
@@ -76,12 +75,25 @@ class MqttService : Service(), Handler.Callback {
 
     //广播器设置
     private lateinit var receiver: BroadcastReceiver
-    private val mqttTopicAction = "com.example.MQTT_PUBLISH_DARK_TOPIC"
+//    private val mqttTopicAction = "com.example.MQTT_PUBLISH_DARK_TOPIC"
     val mqttPushAction = "com.example.MQTT_PUBLISH_DARK_RESULT"
 
 
     override fun onCreate() {
         id = (applicationContext as BaseApplication).androidId
+
+        // MQTT 配置文件导入
+        mqttServerUrl = (applicationContext as BaseApplication).mqttServerUrl
+        mqttClientId = (applicationContext as BaseApplication).mqttClientId
+        mqttTopicCheckAppAlive = (applicationContext as BaseApplication).mqttTopicCheckAppAlive
+        mqttTopicCheckAppAliveResult = (applicationContext as BaseApplication).mqttTopicCheckAppAliveResult
+        mqttTopicDark = (applicationContext as BaseApplication).mqttTopicDark
+        mqttTopicDarkResult = (applicationContext as BaseApplication).mqttTopicDarkResult
+        mqttTopicLastWill = (applicationContext as BaseApplication).mqttTopicLastWill
+        user = id
+        pwd = id
+        LogUtils.log(Log.DEBUG,kTag, "设备唯一ID：$id")
+        LogUtils.log(Log.DEBUG,kTag, "加载 MQTT 配置文件")
 
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         // Android 8.0（API 级别 26）及以上版本需要创建通知渠道
@@ -104,9 +116,7 @@ class MqttService : Service(), Handler.Callback {
         val notification = notificationBuilder?.build()
         startForeground(notificationId, notification)
 
-        // MQTT 配置文件导入
-        loadProperties()
-        LogUtils.log(Log.DEBUG,kTag, "加载 MQTT 配置文件")
+
 
         // 创建并注册本地广播接收器
         receiver = object : BroadcastReceiver() {
@@ -143,14 +153,6 @@ class MqttService : Service(), Handler.Callback {
         }
         // 注册网络回调
         connectivityManager.registerDefaultNetworkCallback(networkCallback)
-
-//        //发送需要订阅的主题
-//        val message = "测试请求主题：$mqttTopicCheckAppAlive\n" +
-//                "测试回复主题:$mqttTopicCheckAppAliveResult\n" +
-//                "打卡请求主题:$mqttTopicDark\n" +
-//                "打卡回复主题:$mqttTopicDarkResult\n" +
-//                "遗嘱主题:$mqttTopicLastWill\n"
-//        sendBroadcast(message)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -177,21 +179,13 @@ class MqttService : Service(), Handler.Callback {
         notificationManager?.notify(notificationId, notification)
     }
 
-    private fun loadProperties() {
-        mqttServerUrl = "ssl://***REMOVED***:8883"
-        mqttClientId = id
-        LogUtils.log(Log.DEBUG,kTag, "设备唯一ID：$mqttClientId")
-        mqttTopicCheckAppAlive = "/topic/$mqttClientId/checkAppAlive"
-        mqttTopicCheckAppAliveResult = "/topic/$mqttClientId/checkAppAliveResult"
-        mqttTopicDark = "/topic/$mqttClientId/dark"
-        mqttTopicDarkResult = "/topic/$mqttClientId/darkResult"
-        mqttTopicLastWill = "/topic/$mqttClientId/LastWill"
-        user = mqttClientId
-        pwd = mqttClientId
-    }
+
 
     fun connectToMqtt() {
         LogUtils.log(Log.DEBUG,kTag, "尝试连接到 MQTT 代理")
+
+        lateinit var encryptedP12File: File
+        lateinit var encryptedCaFile: File
 
         if (isMqttConnected() || isConnecting) {
             LogUtils.log(Log.WARN,kTag, "已经连接或正在连接中，取消连接请求")
@@ -209,14 +203,14 @@ class MqttService : Service(), Handler.Callback {
 
         try {
             // 尝试加载加密文件
-            val encryptedP12File = resources.openRawResource(R.raw.client)
-            val encryptedCaFile = resources.openRawResource(R.raw.ca)
+            encryptedP12File = File(applicationContext.filesDir, "$id.en")
+
+            encryptedCaFile = File(applicationContext.filesDir, "ca.en")
         } catch (e: Resources.NotFoundException) {
             // 如果文件不存在，打印异常信息
             LogUtils.log(Log.WARN, kTag, "加密文件不存在: ${e.message}")
             return // 直接返回
         }
-
 
         val key = generateKeyFromString(id)
         if (key.isEmpty()) {
@@ -224,11 +218,6 @@ class MqttService : Service(), Handler.Callback {
             // 处理解密失败的情况，比如返回或终止操作
             return
         }
-
-        // 加载加密文件
-        val encryptedP12File = File(applicationContext.filesDir, "$id.en")
-
-        val encryptedCaFile = File(applicationContext.filesDir, "ca.en")
 
         val p12Bytes = FileInputStream(encryptedP12File).use { inputStream ->
             aesDecryptInMemory(inputStream, key)

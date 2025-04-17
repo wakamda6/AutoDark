@@ -37,7 +37,7 @@ fun com.autodark.bean.MailInfo.sendTextMail() {
         val mailSubject = this.subject
         mailMessage.subject = mailSubject
         mailMessage.sentDate = Date()
-        val mailContent = "${this.content}，工具版本：${com.autodark.BuildConfig.VERSION_NAME}"
+        val mailContent = "${this.content} 工具版本：${com.autodark.BuildConfig.VERSION_NAME}"
         mailMessage.setText(mailContent)
         Transport.send(mailMessage)
     } catch (ex: MessagingException) {

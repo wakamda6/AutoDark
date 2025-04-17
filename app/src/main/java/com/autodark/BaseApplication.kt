@@ -1,14 +1,32 @@
 package com.autodark
 
 import android.app.Application
+import android.content.Context
 import android.provider.Settings
+import android.util.Log
+import com.autodark.utils.LogUtils
 import com.pengxh.kt.lite.utils.SaveKeyValues
 import com.tencent.bugly.crashreport.CrashReport
+import info.mqtt.android.service.MqttAndroidClient
 import kotlin.properties.Delegates
 
 class BaseApplication : Application() {
 
     var androidId: String = ""
+
+    //mqtt设置
+    lateinit var mqttServerUrl: String
+    lateinit var mqttClientId: String
+    lateinit var user: String
+    lateinit var pwd: String
+    lateinit var mqttClient: MqttAndroidClient
+    lateinit var mqttTopicCheckAppAlive: String
+    lateinit var mqttTopicCheckAppAliveResult: String
+    lateinit var mqttTopicDark: String
+    lateinit var mqttTopicDarkResult: String
+    lateinit var mqttTopicLastWill: String
+
+    var topicMessageToSend: String = ""
 
     companion object {
         private var application: com.autodark.BaseApplication by Delegates.notNull()
@@ -27,6 +45,24 @@ class BaseApplication : Application() {
 
         // 获取设备的 Android ID
         androidId = getUUID()
+
+        //获取订阅主题
+        mqttServerUrl = "ssl://***REMOVED***:8883"
+        mqttClientId = androidId
+        mqttTopicCheckAppAlive = "/topic/$androidId/checkAppAlive"
+        mqttTopicCheckAppAliveResult = "/topic/$androidId/checkAppAliveResult"
+        mqttTopicDark = "/topic/$androidId/dark"
+        mqttTopicDarkResult = "/topic/$androidId/darkResult"
+        mqttTopicLastWill = "/topic/$androidId/LastWill"
+        user = androidId
+        pwd = androidId
+
+        //发送需要订阅的主题
+        topicMessageToSend = "订阅主题：$mqttTopicCheckAppAlive\n" +
+                "测试回复主题: $mqttTopicCheckAppAliveResult\n" +
+                "打卡请求主题: $mqttTopicDark\n" +
+                "打卡回复主题: $mqttTopicDarkResult\n" +
+                "遗嘱主题: $mqttTopicLastWill\n"
     }
 
     private fun initDataBase() {

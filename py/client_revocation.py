@@ -2,11 +2,20 @@ import subprocess
 import sys
 import os
 
-def run_command(command):
+def run_command(command, check_file=None):
+    # 如果需要检查某个文件/目录是否已经删除，若删除则跳过执行
+    if check_file is not None and not os.path.exists(check_file):
+        print(f"[SKIP] {check_file} 不存在，跳过：{command}")
+        return
+
+    print(f"[RUNNING] 执行命令：{command}")
     try:
         subprocess.run(command, check=True, shell=True)
+        print(f"[SUCCESS] 命令执行成功")
     except subprocess.CalledProcessError as e:
-        print(f"Error executing command: {command}\n{e}")
+        print(f"[ERROR] 命令执行失败\n原因：{e}")
+        sys.exit(1)
+
 
 def find_cn_by_serial(serial_number):
     """在 index 文件中查找给定序列号对应的 CN"""
@@ -31,47 +40,54 @@ def generate_device_certificates(pem_id):
     
     cnf_path = f"{base_path}/ca_Autodark.cnf"
 
+    index_path = f"{base_path}/index"
+
     crl_path =  f"{base_path}/crl/crl.pem"
 
     pem_path = f"{base_path}/newcerts/{pem_id}.pem"
-    
-    if os.path.exists(pem_path):
-        #吊销证书
-        command_01 = f"openssl ca -revoke {pem_path} -config {cnf_path}"
-        run_command(command_01)
-        command_02 = f"rm {pem_path}"
-        run_command(command_02)
 
-        #更新crl文件
-        command_03 = f"openssl ca -gencrl -out {crl_path} -config {cnf_path}"
-        run_command(command_03)
-    else:
-        print(f"Directory {pem_path} not exists")
-        return
+    # 根据pem获取设备 ID
+    device_id = find_cn_by_serial(pem_id)
+    device_path = f"{base_path}/certs/{device_id}"
+
+    if not os.path.exists(device_path):
+        if not os.path.exists(pem_path):
+            print(f"Directory {device_path} and pem file {pem_path} not exists")
+            return
+
+    #吊销证书
+    command_01 = f"openssl ca -revoke {pem_path} -config {cnf_path}"
+    run_command(command_01)
+
+    #更新crl文件
+    command_02 = f"openssl ca -gencrl -out {crl_path} -config {cnf_path}"
+    run_command(command_02)
+
+    #查询crl.pem
+    command_03 = f"openssl crl -in {crl_path} -text -noout"
+    print(f"查询crl.pem内容如下：\n")
+    run_command(command_03)
+
+    #删除newcerts中对应的pem文件
+    command_04 = f"rm {pem_path}"
+    run_command(command_04, check_file=pem_path)
+
+    # 删除整个文件夹
+    command_05 = f"rm -rf {device_path}"
+    run_command(command_05, check_file=device_path)
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python3 a.py pem文件名")
+        print("Usage: python3 a.py pem文件名，即下表第3列")
         command = f"cat /etc/ca_Autodark/index"
         run_command(command)
         sys.exit(1)
     
     pem_id = sys.argv[1]
-    
-    # 执行命令
+
     generate_device_certificates(pem_id)
 
-    # 根据pem获取设备 ID
-    device_id = find_cn_by_serial(pem_id)
-
-    # 删除设备文件夹
-    base_path   = f"/etc/ca_Autodark"
-    device_path = f"{base_path}/certs/{device_id}"
-    if not os.path.exists(device_path):
-        print(f"Directory {device_path} not exists. Exiting.")
-        sys.exit(0)
-
-    command_03 = f"rm -rf {device_path}"
-    run_command(command_03)
-    print(f"Directory {device_path} deleted.")
+    command2 = f"cat /etc/ca_Autodark/index"
+    run_command(command2)
 
