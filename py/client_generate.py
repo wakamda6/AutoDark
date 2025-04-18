@@ -71,7 +71,7 @@ def generate_device_certificates(device_id):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python3 a.py <device_id>")
+        print("Usage: <device_id>")
         sys.exit(1)
     
     device_id = sys.argv[1]
