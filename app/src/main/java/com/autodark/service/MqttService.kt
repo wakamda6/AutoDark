@@ -23,26 +23,10 @@ import com.autodark.R
 import com.pengxh.kt.lite.extensions.timestampToCompleteDate
 import com.pengxh.kt.lite.utils.WeakReferenceHandler
 import android.content.Context
-import android.content.res.Resources
-import androidx.appcompat.app.AlertDialog
 import com.autodark.BaseApplication
 import com.autodark.MqttConfigHolder
 import com.autodark.utils.LogUtils.otherShow
-import com.pengxh.kt.lite.widget.dialog.AlertMessageDialog
 import java.io.*
-import java.net.URL
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManagerFactory
-import java.security.KeyStore
-import java.security.cert.CertificateFactory
-import java.security.cert.X509CRL
-import java.security.cert.X509Certificate
-import javax.crypto.Cipher
-import javax.crypto.CipherInputStream
-import javax.crypto.spec.IvParameterSpec
-import javax.crypto.spec.SecretKeySpec
-import javax.net.ssl.*
-
 
 /**
  * mqtt前台服务
@@ -176,53 +160,8 @@ class MqttService : Service(), Handler.Callback {
         notificationManager?.notify(notificationId, notification)
     }
 
-    private fun isCertAvailable(clientCert: X509Certificate, id: String):Boolean {
-        try {
-            val crlUrl = URL("https://***REMOVED***/crl/crl.pem")
-            val crlStream = crlUrl.openStream()
-            val cf = CertificateFactory.getInstance("X.509")
-            val crl = cf.generateCRL(crlStream) as X509CRL
-
-            if (crl.isRevoked(clientCert)) {
-                LogUtils.log(Log.ERROR, kTag, "客户端证书已被吊销")
-                AlertMessageDialog.Builder()
-                    .setContext(this)
-                    .setTitle("证书已被吊销")
-                    .setMessage("验证失败，请将页面截图发送给开发者后重试\nID: $id")
-                    .setPositiveButton("重试")
-                    .setOnDialogButtonClickListener(object :
-                        AlertMessageDialog.OnDialogButtonClickListener {
-                        override fun onConfirmClick() {
-                            isCertAvailable(clientCert, id) // 递归重试
-                        }
-                    }).build().show()
-            } else {
-                LogUtils.log(Log.INFO, kTag, "客户端证书有效，未被吊销")
-                return true
-            }
-        } catch (e: Exception) {
-            LogUtils.log(Log.ERROR, kTag, "吊销验证失败: ${e.message}")
-            AlertMessageDialog.Builder()
-                .setContext(this)
-                .setTitle("证书已被吊销")
-                .setMessage("验证失败，请将页面截图发送给开发者后重试\nID: $id")
-                .setPositiveButton("重试")
-                .setOnDialogButtonClickListener(object :
-                    AlertMessageDialog.OnDialogButtonClickListener {
-                    override fun onConfirmClick() {
-                        isCertAvailable(clientCert, id) // 递归重试
-                    }
-                }).build().show()
-        }
-        return true
-    }
-
-
     private fun connectToMqtt() {
         LogUtils.log(Log.DEBUG,kTag, "尝试连接到 MQTT 代理")
-
-        lateinit var encryptedP12File: File
-        lateinit var encryptedCaFile: File
 
         // 确保网络连接
         if (!NetworkUtils.isNetworkAvailable(this)) {

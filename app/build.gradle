@@ -36,8 +36,8 @@ android {
     productFlavors {
         auto {
 //            debug
-            applicationId "com.autodark"
-//            applicationId = id
+//            applicationId "com.autodark"
+            applicationId = id
         }
     }
     packagingOptions {
@@ -90,8 +90,8 @@ static def createRandomCode() {
 }
 
 static def getBuildDate() {
-    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd", Locale.CHINA)
-    return dateFormat.format(System.currentTimeMillis())
+    def dateFormat = new java.text.SimpleDateFormat("yyyyMMdd_HH_mm", Locale.CHINA)
+    return dateFormat.format(new Date())
 }
 
 dependencies {

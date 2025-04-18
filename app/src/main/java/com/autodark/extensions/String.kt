@@ -3,6 +3,7 @@ package com.autodark.extensions
 import android.content.Context
 import android.widget.Toast
 import com.autodark.utils.Constant
+import com.pengxh.kt.lite.extensions.timestampToCompleteDate
 import com.pengxh.kt.lite.extensions.timestampToDate
 import java.io.File
 import java.text.ParseException
@@ -67,7 +68,7 @@ fun String.createTextMail(subject: String, toAddress: String): com.autodark.bean
     mailInfo.fromAddress = Constant.MAIL_FROM_ADDRESS
     mailInfo.subject = subject // 邮件主题
     val content = if (this == "") {
-        "未监听到打卡成功的通知，请手动登录检查" + System.currentTimeMillis().timestampToDate()
+        "未监听到打卡成功的通知，请手动登录检查" + System.currentTimeMillis().timestampToCompleteDate()
     } else {
         this
     }
