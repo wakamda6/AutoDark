@@ -26,7 +26,9 @@ import android.content.Context
 import android.content.res.Resources
 import androidx.appcompat.app.AlertDialog
 import com.autodark.BaseApplication
+import com.autodark.MqttConfigHolder
 import com.autodark.utils.LogUtils.otherShow
+import com.pengxh.kt.lite.widget.dialog.AlertMessageDialog
 import java.io.*
 import java.net.URL
 import javax.net.ssl.SSLContext
@@ -183,26 +185,34 @@ class MqttService : Service(), Handler.Callback {
 
             if (crl.isRevoked(clientCert)) {
                 LogUtils.log(Log.ERROR, kTag, "客户端证书已被吊销")
-                AlertDialog.Builder(this@MqttService)
+                AlertMessageDialog.Builder()
+                    .setContext(this)
                     .setTitle("证书已被吊销")
                     .setMessage("验证失败，请将页面截图发送给开发者后重试\nID: $id")
-                    .setPositiveButton("重试") { _, _ ->
-                        isCertAvailable(clientCert, id) // 递归重试
-                    }
-                    .show()
+                    .setPositiveButton("重试")
+                    .setOnDialogButtonClickListener(object :
+                        AlertMessageDialog.OnDialogButtonClickListener {
+                        override fun onConfirmClick() {
+                            isCertAvailable(clientCert, id) // 递归重试
+                        }
+                    }).build().show()
             } else {
                 LogUtils.log(Log.INFO, kTag, "客户端证书有效，未被吊销")
                 return true
             }
         } catch (e: Exception) {
             LogUtils.log(Log.ERROR, kTag, "吊销验证失败: ${e.message}")
-            AlertDialog.Builder(this@MqttService)
-                .setTitle("证书验证失败")
-                .setMessage("请检查网络后重试")
-                .setPositiveButton("重试") { _, _ ->
-                    isCertAvailable(clientCert, id) // 递归重试
-                }
-                .show()
+            AlertMessageDialog.Builder()
+                .setContext(this)
+                .setTitle("证书已被吊销")
+                .setMessage("验证失败，请将页面截图发送给开发者后重试\nID: $id")
+                .setPositiveButton("重试")
+                .setOnDialogButtonClickListener(object :
+                    AlertMessageDialog.OnDialogButtonClickListener {
+                    override fun onConfirmClick() {
+                        isCertAvailable(clientCert, id) // 递归重试
+                    }
+                }).build().show()
         }
         return true
     }
@@ -221,92 +231,6 @@ class MqttService : Service(), Handler.Callback {
             return
         }
 
-        try {
-            // 尝试加载加密文件
-            encryptedP12File = File(applicationContext.filesDir, "$id.en")
-
-            encryptedCaFile = File(applicationContext.filesDir, "ca.en")
-        } catch (e: Resources.NotFoundException) {
-            // 如果文件不存在，打印异常信息
-            LogUtils.log(Log.WARN, kTag, "加密文件不存在: ${e.message}")
-            return // 直接返回
-        }
-
-        val key = generateKeyFromString(id)
-        if (key.isEmpty()) {
-            LogUtils.log(Log.ERROR, kTag, "密钥生成失败")
-            // 处理解密失败的情况，比如返回或终止操作
-            return
-        }
-
-        val p12Bytes = FileInputStream(encryptedP12File).use { inputStream ->
-            aesDecryptInMemory(inputStream, key)
-        }
-        if (p12Bytes.isEmpty()) {
-            LogUtils.log(Log.ERROR, kTag, "解密证书文件失败")
-            // 处理解密失败的情况，比如返回或终止操作
-            "解密证书文件失败".otherShow(this@MqttService)
-            return
-        }
-        val caBytes = FileInputStream(encryptedCaFile).use { inputStream ->
-            aesDecryptInMemory(inputStream, key)
-        }
-        if (caBytes.isEmpty()) {
-            LogUtils.log(Log.ERROR, kTag, "解密 CA 文件失败")
-            // 处理解密失败的情况，比如返回或终止操作
-            "解密 CA 文件失败".otherShow(this@MqttService)
-            return
-        }
-
-        // 加载 .p12 文件
-        val p12P = id.toCharArray()
-        val keyStore = KeyStore.getInstance("PKCS12")
-        val p12InputStream = p12Bytes.inputStream()
-        try {
-            keyStore.load(p12InputStream, p12P)
-            LogUtils.log(Log.INFO,kTag, "P12 证书加载成功")
-
-            // 吊销验证
-            val alias = keyStore.aliases().nextElement() // 获取 p12 中的第一个别名
-            val clientCert = keyStore.getCertificate(alias) as X509Certificate
-            if(!isCertAvailable(clientCert, id)){
-                LogUtils.log(Log.WARN,kTag, "证书验证失败")
-                return
-            }
-        } catch (e: Exception) {
-            LogUtils.log(Log.WARN,kTag, "P12 证书验证失败: ${e.message}")
-            return
-        }
-
-        // 创建 KeyManagerFactory 来管理客户端证书和私钥
-        val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
-        keyManagerFactory.init(keyStore, p12P)
-
-        // 加载 CA 根证书
-        val caInputStream = caBytes.inputStream()
-        val certificateFactory = CertificateFactory.getInstance("X.509")
-        val caCertificate = certificateFactory.generateCertificate(caInputStream)
-
-        // 创建一个包含 CA 证书的 KeyStore
-        val caKeyStore = KeyStore.getInstance(KeyStore.getDefaultType())
-        caKeyStore.load(null, null)
-        caKeyStore.setCertificateEntry("ca", caCertificate)
-
-        // 初始化 TrustManagerFactory
-        val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-        trustManagerFactory.init(caKeyStore)
-        //trustManagerFactory.init(null as KeyStore?)  // 默认使用系统信任的证书.不使用系统默认证书，保证内网通信
-
-        // 使用证书和密钥进行进一步的 SSLContext 设置，确保连接安全
-        val sslContext = SSLContext.getInstance("TLSv1.3")
-        try {
-            sslContext.init(keyManagerFactory.keyManagers, trustManagerFactory.trustManagers, null)
-            LogUtils.log(Log.DEBUG,kTag, "SSLContext 初始化成功")
-        } catch (e: Exception) {
-            LogUtils.log(Log.WARN,kTag, "SSLContext 初始化失败: ${e.message}")
-        }
-
-
         mqttClient = MqttAndroidClient(applicationContext, mqttServerUrl, mqttClientId, Ack.AUTO_ACK)
         val options = MqttConnectOptions().apply {
             isCleanSession = true
@@ -324,7 +248,10 @@ class MqttService : Service(), Handler.Callback {
             setWill(mqttTopicLastWill, willMessage.toByteArray(), willQoS, true)
 
             // 使用自定义的 SSLContext
-            socketFactory = sslContext.socketFactory
+            val sslContext = MqttConfigHolder.mqttSslContext
+            if (sslContext != null) {
+                socketFactory = sslContext.socketFactory
+            }
         }
         options.isAutomaticReconnect = true
 
@@ -442,7 +369,7 @@ class MqttService : Service(), Handler.Callback {
         try {
             mqttClient.unsubscribe(topics, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
-                    LogUtils.log(Log.DEBUG,"AuToDark.connectToMqtt", "成功解除订阅主题: ${topics.joinToString(", ")}")
+                    LogUtils.log(Log.DEBUG,kTag, "成功解除订阅主题: ${topics.joinToString(", ")}")
                 }
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
@@ -476,68 +403,6 @@ class MqttService : Service(), Handler.Callback {
 
     fun publishMqttDarkResult(message: String, qos: Int = 1) {
         publishMessage(mqttTopicDarkResult,message,qos)
-    }
-
-    // 计算字符串的SHA-256哈希
-    private fun hashString(input: String): ByteArray {
-        val sha256 = java.security.MessageDigest.getInstance("SHA-256")
-        return sha256.digest(input.toByteArray(Charsets.UTF_8))
-    }
-
-    private fun generateKeyFromString(inputString: String): ByteArray {
-        return try {
-            // 计算字符串的哈希值
-            val stringHash = hashString(inputString)
-
-            // 将哈希值每个字节加1，并将结果转换为 ByteArray
-            val transformedHash = stringHash.map {
-                ((it.toInt() + 1) % 256).toByte()
-            }.toByteArray()
-
-            // 使用前16字节
-            transformedHash.take(16).toByteArray()
-
-        } catch (e: Exception) {
-            // 捕获任何异常并记录日志
-            LogUtils.log(Log.ERROR, kTag, "生成密钥时发生异常: ${e.message}")
-            ByteArray(0)  // 返回空字节数组表示生成密钥失败
-        }
-    }
-
-    // 解密文件并在内存中处理（不保存到文件）
-    private fun aesDecryptInMemory(inputStream: InputStream, key: ByteArray): ByteArray {
-        try {
-            // 读取加密文件，获取IV（前16字节）
-            val iv = ByteArray(16) // AES的IV长度是16字节
-            val bytesRead = inputStream.read(iv) // 读取IV
-            if (bytesRead != 16) {
-                LogUtils.log(Log.ERROR, kTag, "IV长度不正确，解密失败")
-                return ByteArray(0)  // 返回空字节数组
-            }
-
-            // 使用AES解密
-            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-            val ivSpec = IvParameterSpec(iv)
-            val secretKey = SecretKeySpec(key, "AES")
-            cipher.init(Cipher.DECRYPT_MODE, secretKey, ivSpec)
-
-            CipherInputStream(inputStream, cipher).use { cipherInputStream ->
-                ByteArrayOutputStream().use { outputStream ->
-                    val buffer = ByteArray(4096)
-                    var bytesReadInLoop: Int
-                    while (cipherInputStream.read(buffer).also { bytesReadInLoop = it } != -1) {
-                        outputStream.write(buffer, 0, bytesReadInLoop)
-                    }
-                    return outputStream.toByteArray()
-                }
-            }
-
-        } catch (e: Exception) {
-            LogUtils.log(Log.ERROR, kTag, "解密失败: ${e.message}")
-        }
-
-        // 出现任何错误时返回空字节数组
-        return ByteArray(0)
     }
 
     override fun onDestroy() {

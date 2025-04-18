@@ -16,6 +16,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.autodark.BaseApplication
+import com.autodark.MqttConfigHolder
 import com.autodark.adapter.BaseFragmentAdapter
 import com.autodark.extensions.initImmersionBar
 import com.autodark.service.MqttService
@@ -24,16 +25,26 @@ import com.autodark.utils.LogUtils.otherShow
 import com.pengxh.kt.lite.widget.dialog.AlertMessageDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.io.File
-import java.io.FileOutputStream
+import java.io.*
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.KeyStore
+import java.security.cert.CertificateFactory
+import java.security.cert.X509CRL
+import java.security.cert.X509Certificate
+import javax.crypto.Cipher
+import javax.crypto.CipherInputStream
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
+import javax.net.ssl.KeyManagerFactory
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManagerFactory
 
 class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
     private val kTag = "MainActivity"
 
-    var id:String = ""
+    private var darkID:String = ""
 
     //ca文件存储位置
     private var clientEnPath:String = ""
@@ -77,10 +88,10 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         LogUtils.log(Log.INFO, kTag, "应用启动成功")
 
         //id获取
-        id = (applicationContext as BaseApplication).androidId
+        darkID = (applicationContext as BaseApplication).androidId
 
         //ca文件存储位置
-        clientEnPath = "${this.filesDir.absolutePath}/$id.en"
+        clientEnPath = "${this.filesDir.absolutePath}/$darkID.en"
         caEnPath = this.filesDir.absolutePath + "/ca.en"
 
         val fragmentAdapter = BaseFragmentAdapter(supportFragmentManager, fragmentPages)
@@ -107,38 +118,49 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
         //判断证书是否存在，因为涉及文件下载，安卓强制非阻塞
         lifecycleScope.launch(Dispatchers.IO) {
-            val success = initCertsBlocking(this@MainActivity, id)
-            if (!success) {
+            val result = getAndCheckCA(this@MainActivity, darkID)
+            if (result != "CASuccess") {
                 // 回到主线程再弹窗
                 launch(Dispatchers.Main) {
-                    showRetryDialog(this@MainActivity, id)
+                    deleteCA(this@MainActivity, darkID)
+                    showRetryDialog(result,this@MainActivity, darkID)
                 }
             }else {
-                "CA证书获取成功".otherShow(this@MainActivity)
-                // 成功了，继续启动服务
+                "CA证书验证成功".otherShow(this@MainActivity)
                 startService(Intent(this@MainActivity, MqttService::class.java))
             }
         }
     }
 
-    private fun showRetryDialog(context: Context, id: String) {
+    private fun showRetryDialog(result:String,context: Context, ID: String) {
+        var title = ""
+        var message = ""
+        if(result == "CAisRevoked"){
+            title = "证书已被吊销"
+            message = "验证失败，请将页面截图发送给开发者后重试\n"
+        }else if(result == "CAGetFailed"){
+            title = "证书文件下载失败"
+            message = "请将页面截图发送给开发者后重试\n"
+        }
         AlertMessageDialog.Builder()
             .setContext(this)
-            .setTitle("证书文件下载失败")
-            .setMessage("请将页面截图发送给开发者后重试\nID: $id")
+            .setTitle(title)
+            .setMessage(message + "ID：$ID")
             .setPositiveButton("重试")
             .setOnDialogButtonClickListener(object :
                 AlertMessageDialog.OnDialogButtonClickListener {
                 override fun onConfirmClick() {
                     lifecycleScope.launch(Dispatchers.IO) {
-                        val success = initCertsBlocking(context, id)
-                        if (!success) {
+                        //点击后重新下载并检查
+                        val result2 = getAndCheckCA(context, ID)
+                        if (result2 != "CASuccess") {
                             // 回到主线程再弹窗
                             launch(Dispatchers.Main) {
-                                showRetryDialog(context, id)
+                                deleteCA(context, ID)
+                                showRetryDialog(result2,context, ID)
                             }
                         }else {
-                            "CA证书获取成功".show(this@MainActivity)
+                            "CA证书验证成功".otherShow(this@MainActivity)
                             // 成功了，继续启动服务
                             startService(Intent(context, MqttService::class.java))
                         }
@@ -147,12 +169,41 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             }).build().show()
     }
 
-    private fun initCertsBlocking(context: Context, id: String): Boolean {
-        val clientEnPath = File(context.filesDir, "$id.en")
+    //删除ca文件
+    private fun deleteCA(context: Context, ID: String) {
+        val clientEnPath = File(context.filesDir, "$ID.en")
         val caEnPath = File(context.filesDir, "ca.en")
 
-        val baseUrl = "https://***REMOVED***/certs/${id}/en_${id}"
-        val clientEnUrl = "$baseUrl/${id}.en"
+        if (clientEnPath.exists()) {
+            val deleted = clientEnPath.delete()
+            if (deleted) {
+                LogUtils.log(Log.DEBUG, kTag, "客户端证书删除成功")
+            } else {
+                LogUtils.log(Log.WARN, kTag, "客户端证书删除失败")
+            }
+        } else {
+            LogUtils.log(Log.DEBUG, kTag, "客户端证书已删除")
+        }
+
+        if (!caEnPath.exists()) {
+            val deleted = caEnPath.delete()
+            if (deleted) {
+                LogUtils.log(Log.DEBUG, kTag, "CA证书删除成功")
+            } else {
+                LogUtils.log(Log.WARN, kTag, "CA证书删除失败")
+            }
+        }else {
+            LogUtils.log(Log.DEBUG, kTag, "CA证书已删除")
+        }
+    }
+
+    //证书初始化应该包括下载，监测吊销和解密，所有完成后将ssl句柄传递给mqtt service
+    private fun getAndCheckCA(context: Context, ID: String): String {
+        val clientEnPath = File(context.filesDir, "$ID.en")
+        val caEnPath = File(context.filesDir, "ca.en")
+
+        val baseUrl = "https://***REMOVED***/certs/${ID}/en_${ID}"
+        val clientEnUrl = "$baseUrl/${ID}.en"
         val caEnUrl = "$baseUrl/ca.en"
 
         if (!clientEnPath.exists()) {
@@ -169,10 +220,96 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
         if (!clientEnPath.exists() || !caEnPath.exists()) {
             LogUtils.log(Log.ERROR, kTag, "证书文件下载失败")
-            return false
+            return "CAGetFailed"
         }
 
-        return true
+        //验证吊销
+        val key = generateKeyFromString(ID)
+        if (key.isEmpty()) {
+            LogUtils.log(Log.ERROR, kTag, "密钥生成失败")
+            // 处理解密失败的情况，比如返回或终止操作
+            return "CAGetFailed"
+        }
+
+        val p12Bytes = FileInputStream(clientEnPath).use { inputStream ->
+            aesDecryptInMemory(inputStream, key)
+        }
+        if (p12Bytes.isEmpty()) {
+            LogUtils.log(Log.ERROR, kTag, "解密证书文件失败")
+            // 处理解密失败的情况，比如返回或终止操作
+            "解密证书文件失败".show(this@MainActivity)
+            return "CAGetFailed"
+        }
+        val caBytes = FileInputStream(caEnPath).use { inputStream ->
+            aesDecryptInMemory(inputStream, key)
+        }
+        if (caBytes.isEmpty()) {
+            LogUtils.log(Log.ERROR, kTag, "解密 CA 文件失败")
+            // 处理解密失败的情况，比如返回或终止操作
+            "解密 CA 文件失败".show(this@MainActivity)
+            return "CAGetFailed"
+        }
+
+        // 加载 .p12 文件
+        val p12P = ID.toCharArray()
+        val keyStore = KeyStore.getInstance("PKCS12")
+        val p12InputStream = p12Bytes.inputStream()
+        try {
+            keyStore.load(p12InputStream, p12P)
+            LogUtils.log(Log.INFO,kTag, "P12 证书加载成功")
+
+            // 吊销验证
+            val alias = keyStore.aliases().nextElement() // 获取 p12 中的第一个别名
+            val clientCert = keyStore.getCertificate(alias) as X509Certificate
+
+            val crlUrl = URL("https://***REMOVED***/crl/crl.pem")
+            val crlStream = crlUrl.openStream()
+            val cf = CertificateFactory.getInstance("X.509")
+            val crl = cf.generateCRL(crlStream) as X509CRL
+
+            if (crl.isRevoked(clientCert)) {
+                LogUtils.log(Log.ERROR, kTag, "客户端证书已被吊销")
+                "证书已被吊销，禁止连接".show(this@MainActivity)
+                return "CAisRevoked"
+            } else {
+                LogUtils.log(Log.INFO, kTag, "客户端证书有效，未被吊销")
+            }
+        } catch (e: Exception) {
+            LogUtils.log(Log.WARN,kTag, "P12 证书加载失败: ${e.message}")
+            return "CAisRevoked"
+        }
+
+        // 创建 KeyManagerFactory 来管理客户端证书和私钥
+        val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
+        keyManagerFactory.init(keyStore, p12P)
+
+        // 加载 CA 根证书
+        val caInputStream = caBytes.inputStream()
+        val certificateFactory = CertificateFactory.getInstance("X.509")
+        val caCertificate = certificateFactory.generateCertificate(caInputStream)
+
+        // 创建一个包含 CA 证书的 KeyStore
+        val caKeyStore = KeyStore.getInstance(KeyStore.getDefaultType())
+        caKeyStore.load(null, null)
+        caKeyStore.setCertificateEntry("ca", caCertificate)
+
+        // 初始化 TrustManagerFactory
+        val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+        trustManagerFactory.init(caKeyStore)
+        //trustManagerFactory.init(null as KeyStore?)  // 默认使用系统信任的证书.不使用系统默认证书，保证内网通信
+
+        // SSLContext 设置
+        try {
+            MqttConfigHolder.mqttSslContext = SSLContext.getInstance("TLSv1.3").apply {
+                init(keyManagerFactory.keyManagers, trustManagerFactory.trustManagers, null)
+            }
+            LogUtils.log(Log.DEBUG,kTag, "mqttSslContext 初始化成功")
+        } catch (e: Exception) {
+            LogUtils.log(Log.WARN,kTag, "mqttSslContext 初始化失败: ${e.message}")
+            return "CAGetFailed"
+        }
+
+        return "CASuccess"
     }
 
     private fun downloadFileSuspend(urlStr: String, destFile: File){
@@ -199,6 +336,68 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         } catch (e: Exception) {
             LogUtils.log(Log.DEBUG,kTag, "异常下载 $urlStr: ${e.message}")
         }
+    }
+
+    // 计算字符串的SHA-256哈希
+    private fun hashString(input: String): ByteArray {
+        val sha256 = java.security.MessageDigest.getInstance("SHA-256")
+        return sha256.digest(input.toByteArray(Charsets.UTF_8))
+    }
+
+    private fun generateKeyFromString(inputString: String): ByteArray {
+        return try {
+            // 计算字符串的哈希值
+            val stringHash = hashString(inputString)
+
+            // 将哈希值每个字节加1，并将结果转换为 ByteArray
+            val transformedHash = stringHash.map {
+                ((it.toInt() + 1) % 256).toByte()
+            }.toByteArray()
+
+            // 使用前16字节
+            transformedHash.take(16).toByteArray()
+
+        } catch (e: Exception) {
+            // 捕获任何异常并记录日志
+            LogUtils.log(Log.ERROR, kTag, "生成密钥时发生异常: ${e.message}")
+            ByteArray(0)  // 返回空字节数组表示生成密钥失败
+        }
+    }
+
+    // 解密文件并在内存中处理（不保存到文件）
+    private fun aesDecryptInMemory(inputStream: InputStream, key: ByteArray): ByteArray {
+        try {
+            // 读取加密文件，获取IV（前16字节）
+            val iv = ByteArray(16) // AES的IV长度是16字节
+            val bytesRead = inputStream.read(iv) // 读取IV
+            if (bytesRead != 16) {
+                LogUtils.log(Log.ERROR, kTag, "IV长度不正确，解密失败")
+                return ByteArray(0)  // 返回空字节数组
+            }
+
+            // 使用AES解密
+            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            val ivSpec = IvParameterSpec(iv)
+            val secretKey = SecretKeySpec(key, "AES")
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, ivSpec)
+
+            CipherInputStream(inputStream, cipher).use { cipherInputStream ->
+                ByteArrayOutputStream().use { outputStream ->
+                    val buffer = ByteArray(4096)
+                    var bytesReadInLoop: Int
+                    while (cipherInputStream.read(buffer).also { bytesReadInLoop = it } != -1) {
+                        outputStream.write(buffer, 0, bytesReadInLoop)
+                    }
+                    return outputStream.toByteArray()
+                }
+            }
+
+        } catch (e: Exception) {
+            LogUtils.log(Log.ERROR, kTag, "解密失败: ${e.message}")
+        }
+
+        // 出现任何错误时返回空字节数组
+        return ByteArray(0)
     }
 
     private fun sendBroadcast(message: String) {
