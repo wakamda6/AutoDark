@@ -17,6 +17,17 @@
 4. 设置手机屏幕常亮
 5. 连接充电器
 
+## 优点
+
+1. 稳定
+2. 安全
+
+## 缺点
+
+1. 需要备用手机
+2. 需要打卡环境有网
+3. 需要充电才能达到最大效果
+
 ## 致谢
 
 部分代码借鉴了[AutoDingding](https://gitee.com/AndroidCoderPeng/AutoDingding)
