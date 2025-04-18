@@ -2,7 +2,9 @@
 
 ## 版本信息
 ![版本](https://img.shields.io/badge/version-v2.0.1.2-blue)
+
 发布日期: 2025-04-18
+
 [查看完整版本日志](CHANGELOG.md)
 
 ## 功能
