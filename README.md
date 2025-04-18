@@ -35,5 +35,3 @@ AutoDark 是一款基于 MQTT 协议的远程打卡工具，旨在为用户提�
 #### 说明
 部分代码fork：https://github.com/AndroidCoderPeng/AutoDingding
 添加了mqtt远程打卡和远程获取打卡结果功能
-
-#### 如果还有问题，请加QQ群：560354109
