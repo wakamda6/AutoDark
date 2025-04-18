@@ -35,7 +35,6 @@ import android.util.Log
 import android.view.*
 import android.widget.ImageView
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.lifecycle.lifecycleScope
 import com.autodark.BaseApplication
 import com.autodark.extensions.*
 import com.google.zxing.BarcodeFormat
@@ -43,8 +42,6 @@ import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import com.pengxh.kt.lite.extensions.show
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 
 class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.Callback {
@@ -144,13 +141,13 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
                             SaveKeyValues.putValue(Constant.EMAIL_ADDRESS, value)
                             binding.emailTextView.text = value
 
-                            //发送订阅主题
-                            lifecycleScope.launch(Dispatchers.IO) {
-                                topicMessageToSend.createTextMail(
-                                    "控制手机需要订阅的主题", value
-                                )?.sendTextMail()
-                                LogUtils.log(Log.DEBUG, kTag, "发送主题成功")
-                            }
+//                            //发送订阅主题
+//                            lifecycleScope.launch(Dispatchers.IO) {
+//                                topicMessageToSend.createTextMail(
+//                                    "控制手机需要订阅的主题", value
+//                                )?.sendTextMail()
+//                                LogUtils.log(Log.DEBUG, kTag, "发送主题成功")
+//                            }
                         } else {
                             LogUtils.log(Log.DEBUG,kTag,"接收邮箱输入为空")
                             "什么都还没输入呢！".show(requireContext())
