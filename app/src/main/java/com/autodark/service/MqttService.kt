@@ -24,13 +24,17 @@ import com.pengxh.kt.lite.extensions.timestampToCompleteDate
 import com.pengxh.kt.lite.utils.WeakReferenceHandler
 import android.content.Context
 import android.content.res.Resources
+import androidx.appcompat.app.AlertDialog
 import com.autodark.BaseApplication
 import com.autodark.utils.LogUtils.otherShow
 import java.io.*
+import java.net.URL
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 import java.security.KeyStore
 import java.security.cert.CertificateFactory
+import java.security.cert.X509CRL
+import java.security.cert.X509Certificate
 import javax.crypto.Cipher
 import javax.crypto.CipherInputStream
 import javax.crypto.spec.IvParameterSpec
@@ -170,9 +174,41 @@ class MqttService : Service(), Handler.Callback {
         notificationManager?.notify(notificationId, notification)
     }
 
+    private fun isCertAvailable(clientCert: X509Certificate, id: String):Boolean {
+        try {
+            val crlUrl = URL("https://***REMOVED***/crl/crl.pem")
+            val crlStream = crlUrl.openStream()
+            val cf = CertificateFactory.getInstance("X.509")
+            val crl = cf.generateCRL(crlStream) as X509CRL
+
+            if (crl.isRevoked(clientCert)) {
+                LogUtils.log(Log.ERROR, kTag, "客户端证书已被吊销")
+                AlertDialog.Builder(this@MqttService)
+                    .setTitle("证书已被吊销")
+                    .setMessage("验证失败，请将页面截图发送给开发者后重试\nID: $id")
+                    .setPositiveButton("重试") { _, _ ->
+                        isCertAvailable(clientCert, id) // 递归重试
+                    }
+                    .show()
+            } else {
+                LogUtils.log(Log.INFO, kTag, "客户端证书有效，未被吊销")
+                return true
+            }
+        } catch (e: Exception) {
+            LogUtils.log(Log.ERROR, kTag, "吊销验证失败: ${e.message}")
+            AlertDialog.Builder(this@MqttService)
+                .setTitle("证书验证失败")
+                .setMessage("请检查网络后重试")
+                .setPositiveButton("重试") { _, _ ->
+                    isCertAvailable(clientCert, id) // 递归重试
+                }
+                .show()
+        }
+        return true
+    }
 
 
-    fun connectToMqtt() {
+    private fun connectToMqtt() {
         LogUtils.log(Log.DEBUG,kTag, "尝试连接到 MQTT 代理")
 
         lateinit var encryptedP12File: File
@@ -229,8 +265,17 @@ class MqttService : Service(), Handler.Callback {
         try {
             keyStore.load(p12InputStream, p12P)
             LogUtils.log(Log.INFO,kTag, "P12 证书加载成功")
+
+            // 吊销验证
+            val alias = keyStore.aliases().nextElement() // 获取 p12 中的第一个别名
+            val clientCert = keyStore.getCertificate(alias) as X509Certificate
+            if(!isCertAvailable(clientCert, id)){
+                LogUtils.log(Log.WARN,kTag, "证书验证失败")
+                return
+            }
         } catch (e: Exception) {
-            LogUtils.log(Log.WARN,kTag, "P12 证书加载失败: ${e.message}")
+            LogUtils.log(Log.WARN,kTag, "P12 证书验证失败: ${e.message}")
+            return
         }
 
         // 创建 KeyManagerFactory 来管理客户端证书和私钥
