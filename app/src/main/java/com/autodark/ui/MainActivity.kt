@@ -298,9 +298,11 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     hours = TimeUnit.MILLISECONDS.toHours(diffInMillies) % 24
 
                     val times = "剩余时长:"+days+"天"+hours+"小时"
-                    times.show(this@MainActivity)
+                    runOnUiThread {
+                        times.show(this@MainActivity)
+                    }
                 }
-                LogUtils.log(Log.WARN,kTag, "证书剩余时间：$days 天 $hours 小时")
+                LogUtils.log(Log.DEBUG,kTag, "证书剩余时间：$days 天 $hours 小时")
             }
         } catch (e: Exception) {
             LogUtils.log(Log.WARN,kTag, "P12 证书加载失败: ${e.message}")
