@@ -32,6 +32,8 @@ import java.security.KeyStore
 import java.security.cert.CertificateFactory
 import java.security.cert.X509CRL
 import java.security.cert.X509Certificate
+import java.util.*
+import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
 import javax.crypto.CipherInputStream
 import javax.crypto.spec.IvParameterSpec
@@ -39,6 +41,7 @@ import javax.crypto.spec.SecretKeySpec
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
+import kotlin.collections.ArrayList
 
 class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
@@ -49,6 +52,10 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     //ca文件存储位置
     private var clientEnPath:String = ""
     private var caEnPath :String = ""
+
+    //剩余天数
+    private var days= 0L
+    private var hours= 0L
 
     //页面设置
     private val fragmentPages = ArrayList<Fragment>()
@@ -135,12 +142,19 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     private fun showRetryDialog(result:String,context: Context, ID: String) {
         var title = ""
         var message = ""
-        if(result == "CAisRevoked"){
-            title = "证书已被吊销"
-            message = "验证失败，请将页面截图发送给开发者后重试\n"
-        }else if(result == "CAGetFailed"){
-            title = "证书文件下载失败"
-            message = "请将页面截图发送给开发者后重试\n"
+        when (result) {
+            "CAisRevoked" -> {
+                title = "证书已被吊销"
+                message = "验证失败，请将页面截图发送给开发者后重试\n"
+            }
+            "CAGetFailed" -> {
+                title = "证书文件下载失败"
+                message = "请将页面截图发送给开发者后重试\n"
+            }
+            "CAisTimeout" -> {
+                title = "证书已过期"
+                message = "请联系开发者购买时长\n"
+            }
         }
         AlertMessageDialog.Builder()
             .setContext(this)
@@ -181,19 +195,15 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             } else {
                 LogUtils.log(Log.WARN, kTag, "客户端证书删除失败")
             }
-        } else {
-            LogUtils.log(Log.DEBUG, kTag, "客户端证书已删除")
         }
 
-        if (!caEnPath.exists()) {
+        if (caEnPath.exists()) {
             val deleted = caEnPath.delete()
             if (deleted) {
                 LogUtils.log(Log.DEBUG, kTag, "CA证书删除成功")
             } else {
                 LogUtils.log(Log.WARN, kTag, "CA证书删除失败")
             }
-        }else {
-            LogUtils.log(Log.DEBUG, kTag, "CA证书已删除")
         }
     }
 
@@ -223,7 +233,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             return "CAGetFailed"
         }
 
-        //验证吊销
         val key = generateKeyFromString(ID)
         if (key.isEmpty()) {
             LogUtils.log(Log.ERROR, kTag, "密钥生成失败")
@@ -273,6 +282,19 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                 return "CAisRevoked"
             } else {
                 LogUtils.log(Log.INFO, kTag, "客户端证书有效，未被吊销")
+                // 计算剩余天数
+                val now = Date()
+                val notAfter = clientCert.notAfter
+                val diffInMillies = notAfter.time - now.time
+                if (diffInMillies <= 0) {
+                    // 证书已过期
+                    days = 0
+                    hours = 0
+                    LogUtils.log(Log.WARN,kTag, "证书已过期")
+                    "证书已到期，请联系开发者购买时长".show(this@MainActivity)
+                    return "CAisTimeout"
+                }
+                LogUtils.log(Log.WARN,kTag, "证书剩余时间：$days 天 $hours 小时")
             }
         } catch (e: Exception) {
             LogUtils.log(Log.WARN,kTag, "P12 证书加载失败: ${e.message}")
