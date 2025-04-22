@@ -293,6 +293,12 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     LogUtils.log(Log.WARN,kTag, "证书已过期")
                     "证书已到期，请联系开发者购买时长".show(this@MainActivity)
                     return "CAisTimeout"
+                } else {
+                    days = TimeUnit.MILLISECONDS.toDays(diffInMillies)
+                    hours = TimeUnit.MILLISECONDS.toHours(diffInMillies) % 24
+
+                    val times = "剩余时长:"+days+"天"+hours+"小时"
+                    times.show(this@MainActivity)
                 }
                 LogUtils.log(Log.WARN,kTag, "证书剩余时间：$days 天 $hours 小时")
             }
