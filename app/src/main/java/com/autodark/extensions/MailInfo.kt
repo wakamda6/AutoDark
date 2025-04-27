@@ -14,6 +14,8 @@ import javax.mail.internet.MimeBodyPart
 import javax.mail.internet.MimeMessage
 import javax.mail.internet.MimeMultipart
 import javax.mail.internet.MimeUtility
+import com.autodark.BuildConfig
+
 
 /**
  * 以文本格式发送邮件

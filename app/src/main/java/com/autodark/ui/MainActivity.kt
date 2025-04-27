@@ -452,4 +452,23 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             }
         } else super.onKeyDown(keyCode, event)
     }
+
+    //正常返回桌面后再进入需要检测证书
+    override fun onRestart() {
+        super.onRestart()
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            val result = getAndCheckCA(this@MainActivity, darkID)
+            if (result != "CASuccess") {
+                // 回到主线程再弹窗
+                launch(Dispatchers.Main) {
+                    deleteCA(this@MainActivity, darkID)
+                    showRetryDialog(result,this@MainActivity, darkID)
+                }
+            }else {
+                "验证成功".otherShow(this@MainActivity)
+                startService(Intent(this@MainActivity, MqttService::class.java))
+            }
+        }
+    }
 }
