@@ -2,6 +2,7 @@ package com.autodark.service
 
 import com.autodark.utils.LogUtils
 import android.app.Notification
+import android.content.Context
 import android.content.Intent
 import android.os.BatteryManager
 import android.service.notification.NotificationListenerService
@@ -30,7 +31,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
-    class NotificationMonitorService : NotificationListenerService(), LifecycleOwner {
+class NotificationMonitorService : NotificationListenerService(), LifecycleOwner {
 
     private val kTag = "NotificationMonitorService"
     private val registry = LifecycleRegistry(this)
@@ -52,28 +53,42 @@ import java.util.UUID
     /**
      * 有可用的并且和通知管理器连接成功时回调
      */
-    private var isInitialized = false
+    private fun isServiceInitialized(): Boolean {
+        return getSharedPreferences("service_prefs", Context.MODE_PRIVATE)
+            .getBoolean("is_initialized", false)
+    }
+
+    private fun markServiceInitialized() {
+        getSharedPreferences("service_prefs", Context.MODE_PRIVATE)
+            .edit().putBoolean("is_initialized", true).apply()
+    }
+
+    private fun clearServiceInitialized() {
+        getSharedPreferences("service_prefs", Context.MODE_PRIVATE)
+            .edit().remove("is_initialized").apply()
+    }
+
     override fun onListenerConnected() {
         try {
-            if (!isInitialized) {
-                isInitialized = true
-                LogUtils.log(Log.DEBUG,kTag, "通知监听服务初始化")
+            if (!isServiceInitialized()) {
+                LogUtils.log(Log.DEBUG, kTag, "通知监听服务初始化")
                 SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
-            }else{
-                LogUtils.log(Log.DEBUG,kTag, "通知监听服务已经初始化,不再初始化...")
+                markServiceInitialized()
+            } else {
+                LogUtils.log(Log.DEBUG, kTag, "通知监听服务已经初始化,不再初始化...")
             }
         } catch (e: Exception) {
             LogUtils.log(Log.ERROR, kTag, "发生异常: ${e.message}")
-            isInitialized = false // 允许重新注册
-            // 其他错误处理逻辑
+            // 可清除标记以允许下次初始化
+            getSharedPreferences("service_prefs", Context.MODE_PRIVATE)
+                .edit().remove("is_initialized").apply()
         }
-
     }
 
     override fun onListenerDisconnected() {
         LogUtils.log(Log.DEBUG,kTag, "通知监听服务已关闭")
         SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090802)
-        isInitialized = false
+        clearServiceInitialized()
     }
 
     /**
@@ -96,11 +111,9 @@ import java.util.UUID
             return
         }
 
-        if(!notice?.equals(FOREGROUND_RUNNING_SERVICE_TITLE)){
+        if(notice != FOREGROUND_RUNNING_SERVICE_TITLE){
             LogUtils.log(Log.DEBUG,kTag, "内容 : $notice")
         }
-
-//        SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
 
         val notificationBean = com.autodark.bean.NotificationBean().apply {
             uuid = UUID.randomUUID().toString()

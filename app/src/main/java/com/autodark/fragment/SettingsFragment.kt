@@ -257,16 +257,17 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
         }
 
         binding.noticeSwitch.setOnCheckedChangeListener { _, isChecked ->
+            LogUtils.log(Log.DEBUG, kTag, "通知监听开关被点击，当前状态: ${binding.noticeSwitch.isChecked}")
             if (isChecked) {
                 if (!isNotificationListenerEnabled(requireContext())) {
-                    // 暂时先取消勾选，授权成功后再设为 true
-                    binding.noticeSwitch.isChecked = false
-
                     val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                     notificationPermissionLauncher.launch(intent)
+                    LogUtils.log(Log.DEBUG, kTag, "授权通知监听成功")
+                }else{
+                    LogUtils.log(Log.DEBUG, kTag, "通知监听已授权")
                 }
             } else {
-                // 关闭开关时的其他处理（可选）
+                LogUtils.log(Log.DEBUG, kTag, "关闭开关")
             }
         }
 
@@ -469,10 +470,9 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
         binding.backToHomeSwitch.isChecked = backToHome
         LogUtils.log(Log.DEBUG,kTag,"返回主界面开关状态: $backToHome")
 
-        if (requireContext().notificationEnable()) {
-            binding.tipsView.text = "通知监听服务状态查询中，请稍后"
-            binding.tipsView.setTextColor(R.color.purple_500.convertColor(requireContext()))
-            LogUtils.log(Log.DEBUG,kTag,"通知监听服务状态查询中")
+        binding.noticeSwitch.isChecked = isNotificationListenerEnabled(requireContext())
+        if (binding.noticeSwitch.isChecked) {
+            binding.tipsView.visibility = View.GONE
         } else {
             binding.tipsView.text = "通知监听服务未开启，无法监听打卡通知"
             binding.tipsView.setTextColor(R.color.red.convertColor(requireContext()))
