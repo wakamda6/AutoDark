@@ -6,4 +6,6 @@ object MqttConfigHolder {
     var mqttSslContext: SSLContext? = null
 
     var isconnected: Boolean = false
+
+    var isMqttFirstRun:Boolean = true
 }

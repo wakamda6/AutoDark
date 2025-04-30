@@ -16,6 +16,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import com.autodark.BaseApplication
 import com.autodark.MqttConfigHolder
+import com.autodark.MqttConfigHolder.isMqttFirstRun
 import com.autodark.adapter.BaseFragmentAdapter
 import com.autodark.extensions.initImmersionBar
 import com.autodark.service.MqttService
@@ -109,7 +110,16 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     showRetryDialog(result,this@MainActivity, darkID)
                 }
             }else {
-                startService(Intent(this@MainActivity, MqttService::class.java))
+                if(isMqttFirstRun){
+                    LogUtils.log(Log.DEBUG, kTag, "第一次启动mqtt")
+                    startService(Intent(this@MainActivity, MqttService::class.java))
+                }else{
+                    if(!MqttConfigHolder.isconnected) {
+                        LogUtils.log(Log.DEBUG, kTag, "mqtt重连")
+                        val intent = Intent("RECONNECT_MQTT")
+                        sendBroadcast(intent)
+                    }
+                }
             }
         }
     }
@@ -149,8 +159,16 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                                 showRetryDialog(result2,context, ID)
                             }
                         }else {
-                            // 成功了，继续启动服务
-                            startService(Intent(context, MqttService::class.java))
+                            if(isMqttFirstRun){
+                                LogUtils.log(Log.DEBUG, kTag, "第一次启动mqtt")
+                                startService(Intent(this@MainActivity, MqttService::class.java))
+                            }else{
+                                if(!MqttConfigHolder.isconnected) {
+                                    LogUtils.log(Log.DEBUG, kTag, "mqtt重连")
+                                    val intent = Intent("RECONNECT_MQTT")
+                                    sendBroadcast(intent)
+                                }
+                            }
                         }
                     }
                 }

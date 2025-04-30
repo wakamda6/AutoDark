@@ -48,8 +48,6 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
 
     private val kTag = "SettingsFragment"
 
-    var topicMessageToSend:String = ""
-
     var id:String = ""
 
     companion object {
@@ -94,7 +92,6 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
         binding.appVersion.text = com.autodark.BuildConfig.VERSION_NAME
         LogUtils.log(Log.DEBUG,kTag,"Fragment 创建，应用版本: ${com.autodark.BuildConfig.VERSION_NAME}")
         val app = requireActivity().application as BaseApplication
-        topicMessageToSend = app.topicMessageToSend
     }
 
     override fun initEvent() {

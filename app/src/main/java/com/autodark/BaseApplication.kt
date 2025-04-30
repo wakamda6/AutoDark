@@ -26,8 +26,6 @@ class BaseApplication : Application() {
     lateinit var mqttTopicDarkResult: String
     lateinit var mqttTopicLastWill: String
 
-    var topicMessageToSend: String = ""
-
     companion object {
         private var application: com.autodark.BaseApplication by Delegates.notNull()
 
@@ -56,13 +54,6 @@ class BaseApplication : Application() {
         mqttTopicLastWill = "/topic/$androidId/LastWill"
         user = androidId
         pwd = androidId
-
-        //发送需要订阅的主题
-        topicMessageToSend = "订阅主题：$mqttTopicCheckAppAlive\n" +
-                "测试回复主题: $mqttTopicCheckAppAliveResult\n" +
-                "打卡请求主题: $mqttTopicDark\n" +
-                "打卡回复主题: $mqttTopicDarkResult\n" +
-                "遗嘱主题: $mqttTopicLastWill\n"
     }
 
     private fun initDataBase() {

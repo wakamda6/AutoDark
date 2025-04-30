@@ -25,6 +25,7 @@ import com.pengxh.kt.lite.utils.WeakReferenceHandler
 import android.content.Context
 import com.autodark.BaseApplication
 import com.autodark.MqttConfigHolder
+import com.autodark.MqttConfigHolder.isMqttFirstRun
 import com.autodark.MqttConfigHolder.isconnected
 import java.io.*
 
@@ -69,6 +70,7 @@ class MqttService : Service(), Handler.Callback {
     val reconnect  = "RECONNECT_MQTT"
 
     override fun onCreate() {
+        isMqttFirstRun = false
         id = (applicationContext as BaseApplication).androidId
 
         // MQTT 配置文件导入
@@ -174,7 +176,7 @@ class MqttService : Service(), Handler.Callback {
     private fun reconnectMqtt() {
         LogUtils.log(Log.DEBUG,kTag, "尝试重连mqtt")
 
-        mqttClient?.disconnect()
+        mqttClient.disconnect()
         connectToMqtt()
     }
     private fun connectToMqtt() {
