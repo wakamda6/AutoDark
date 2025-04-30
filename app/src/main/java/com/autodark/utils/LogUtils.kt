@@ -54,11 +54,5 @@ object LogUtils {
         }
     }
 
-    fun String.otherShow(context: Context) {
-        ContextCompat.getMainExecutor(context).execute {
-            Toast.makeText(context, this, Toast.LENGTH_SHORT).show()
-        }
-    }
-
 }
 

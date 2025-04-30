@@ -25,7 +25,7 @@ import com.pengxh.kt.lite.utils.WeakReferenceHandler
 import android.content.Context
 import com.autodark.BaseApplication
 import com.autodark.MqttConfigHolder
-import com.autodark.utils.LogUtils.otherShow
+import com.autodark.MqttConfigHolder.isconnected
 import java.io.*
 
 /**
@@ -64,6 +64,9 @@ class MqttService : Service(), Handler.Callback {
     //广播器设置
     private lateinit var receiver: BroadcastReceiver
     val mqttPushAction = "com.example.MQTT_PUBLISH_DARK_RESULT"
+    //重启mqtt连接广播设置
+    private lateinit var reconnectReceiver: BroadcastReceiver
+    val reconnect  = "RECONNECT_MQTT"
 
     override fun onCreate() {
         id = (applicationContext as BaseApplication).androidId
@@ -118,6 +121,15 @@ class MqttService : Service(), Handler.Callback {
         val mqttFilter = IntentFilter(mqttPushAction)
         LocalBroadcastManager.getInstance(this).registerReceiver(receiver, mqttFilter)
 
+        //重连广播
+        reconnectReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == reconnect) {
+                    reconnectMqtt()
+                }
+            }
+        }
+
         // 初始化网络相关配置
         connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         networkCallback = object : ConnectivityManager.NetworkCallback() {
@@ -127,7 +139,6 @@ class MqttService : Service(), Handler.Callback {
 
             override fun onLost(network: Network) {
                 // 网络丢失时可以选择执行其他操作
-                "网络异常".otherShow(this@MqttService)
             }
         }
         // 注册网络回调
@@ -160,13 +171,19 @@ class MqttService : Service(), Handler.Callback {
         notificationManager?.notify(notificationId, notification)
     }
 
+    private fun reconnectMqtt() {
+        LogUtils.log(Log.DEBUG,kTag, "尝试重连mqtt")
+
+        mqttClient?.disconnect()
+        connectToMqtt()
+    }
     private fun connectToMqtt() {
         LogUtils.log(Log.DEBUG,kTag, "尝试连接到 MQTT 代理")
 
         // 确保网络连接
         if (!NetworkUtils.isNetworkAvailable(this)) {
             LogUtils.log(Log.WARN,kTag, "网络不可用，无法连接到 MQTT 代理")
-            "网络异常".otherShow(this@MqttService)
+            isconnected = false
             return
         }
 
@@ -197,13 +214,12 @@ class MqttService : Service(), Handler.Callback {
         try {
             mqttClient.connect(options, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
-                    LogUtils.log(Log.DEBUG,kTag, "$mqttServerUrl 连接成功")
+                    LogUtils.log(Log.INFO,kTag, "$mqttServerUrl 连接成功")
 
                     val topicsToSubscribe = arrayOf(mqttTopicCheckAppAlive,mqttTopicDark)
                     val qosLevels = intArrayOf(1,1) // QoS 级别
                     subscribeToTopics(topicsToSubscribe, qosLevels) // 连接成功后订阅主题
-
-                    "Mqtt主题订阅成功".otherShow(this@MqttService)
+                    isconnected = true
                 }
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
@@ -219,7 +235,7 @@ class MqttService : Service(), Handler.Callback {
                         // 其他异常类型
                         LogUtils.log(Log.ERROR, kTag, "未知错误: ${exception?.message}")
                     }
-                    "mqtt通信失败".otherShow(this@MqttService)
+                    isconnected =false
                 }
             })
         } catch (e: MqttException) {
@@ -237,13 +253,15 @@ class MqttService : Service(), Handler.Callback {
                 } else {
                     LogUtils.log(Log.ERROR, kTag, "MQTT 连接断开，原因未知")
                 }
+                isconnected = false
             }
 
             override fun connectComplete(reconnect: Boolean, serverURI: String?) {
                 if (reconnect) {
+                    isconnected = true
                     LogUtils.log(Log.INFO, kTag, "重连成功")
-                    "mqtt重连成功".otherShow(this@MqttService)
                 } else {
+                    isconnected = true
                     LogUtils.log(Log.INFO, kTag, "初次连接成功")
                     return
                 }
@@ -337,7 +355,6 @@ class MqttService : Service(), Handler.Callback {
         } catch (e: MqttException) {
             LogUtils.log(Log.ERROR,kTag, "消息发布失败: ${e.message}")
         }
-        "mqtt发布消息成功".otherShow(this@MqttService)
     }
 
     fun publishMqttDarkResult(message: String, qos: Int = 1) {
@@ -351,6 +368,7 @@ class MqttService : Service(), Handler.Callback {
             unsubscribeFromTopics(arrayOf(mqttTopicCheckAppAlive, mqttTopicDark))
             //断开连接
             mqttClient.disconnect()
+            isconnected = false
             // 注销网络回调
             connectivityManager.unregisterNetworkCallback(networkCallback)
             weakReferenceHandler.removeCallbacksAndMessages(null)
