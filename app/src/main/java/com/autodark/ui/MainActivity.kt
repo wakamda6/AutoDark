@@ -48,10 +48,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
     private var darkID:String = ""
 
-    //ca文件存储位置
-    private var clientEnPath:String = ""
-    private var caEnPath :String = ""
-
     //剩余天数
     private var days= 0L
     private var hours= 0L
@@ -91,10 +87,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
         //id获取
         darkID = (applicationContext as BaseApplication).androidId
-
-        //ca文件存储位置
-        clientEnPath = "${this.filesDir.absolutePath}/$darkID.en"
-        caEnPath = this.filesDir.absolutePath + "/ca.en"
 
         val fragmentAdapter = BaseFragmentAdapter(supportFragmentManager, fragmentPages)
         binding.viewPager.adapter = fragmentAdapter
@@ -200,7 +192,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     }
 
     //证书初始化应该包括下载，监测吊销和解密，所有完成后将ssl句柄传递给mqtt service
-    private fun getAndCheckCA(context: Context, ID: String): String {
+    private fun getAndCheckCA(context: Context, ID: String,retried: Boolean = false): String {
         val clientEnPath = File(context.filesDir, "$ID.en")
         val caEnPath = File(context.filesDir, "ca.en")
 
@@ -237,8 +229,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         }
         if (p12Bytes.isEmpty()) {
             LogUtils.log(Log.ERROR, kTag, "解密证书文件失败")
-            // 处理解密失败的情况，比如返回或终止操作
-            "解密证书文件失败".show(this@MainActivity)
             return "CAGetFailed"
         }
         val caBytes = FileInputStream(caEnPath).use { inputStream ->
@@ -246,8 +236,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         }
         if (caBytes.isEmpty()) {
             LogUtils.log(Log.ERROR, kTag, "解密 CA 文件失败")
-            // 处理解密失败的情况，比如返回或终止操作
-            "解密 CA 文件失败".show(this@MainActivity)
             return "CAGetFailed"
         }
 
@@ -269,9 +257,24 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             val crl = cf.generateCRL(crlStream) as X509CRL
 
             if (crl.isRevoked(clientCert)) {
-                LogUtils.log(Log.ERROR, kTag, "客户端证书已被吊销")
-                "证书已被吊销，禁止连接".show(this@MainActivity)
-                return "CAisRevoked"
+                LogUtils.log(Log.WARN, kTag, "客户端证书已被吊销,重新下载证书验证")
+                if (retried) {
+                    LogUtils.log(Log.ERROR, kTag, "证书吊销验证失败，已重试过一次")
+                    return "CAisRevoked"
+                }
+                downloadFileSuspend(clientEnUrl, clientEnPath)
+                downloadFileSuspend(caEnUrl, caEnPath)
+
+                val result = getAndCheckCA(context, ID,retried = true)
+                return if (result != "CASuccess") {
+                    LogUtils.log(Log.WARN, kTag, "验证失败")
+                    "CAisRevoked"
+                }else{
+                    LogUtils.log(Log.INFO, kTag, "验证成功")
+                    "CASuccess"
+                }
+
+
             } else {
                 LogUtils.log(Log.INFO, kTag, "客户端证书有效，未被吊销")
                 // 计算剩余天数
@@ -283,7 +286,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     days = 0
                     hours = 0
                     LogUtils.log(Log.WARN,kTag, "证书已过期")
-                    "证书已到期，请联系开发者购买时长".show(this@MainActivity)
                     return "CAisTimeout"
                 } else {
                     days = TimeUnit.MILLISECONDS.toDays(diffInMillies)
@@ -335,6 +337,16 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     }
 
     private fun downloadFileSuspend(urlStr: String, destFile: File){
+        //先删除
+        if (destFile.exists()) {
+            val deleted = destFile.delete()
+            if (deleted) {
+                LogUtils.log(Log.DEBUG, kTag, "证书删除成功")
+            } else {
+                LogUtils.log(Log.WARN, kTag, "证书删除失败")
+            }
+        }
+
         try {
             val url = URL(urlStr)
             val connection = url.openConnection() as HttpURLConnection
