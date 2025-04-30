@@ -111,7 +111,7 @@ class MqttService : Service(), Handler.Callback {
                 // 处理接收到的消息
                 val message = intent?.getStringExtra("message")
                 if (intent?.action == mqttPushAction) {
-                    LogUtils.log(Log.DEBUG,kTag, "收到CountDownTimerManager的发送打卡结果通知：$message")
+                    LogUtils.log(Log.DEBUG,kTag, "收到 打卡结果 广播：$message")
                     if (message != null) {
                         publishMqttDarkResult(message,1)
                     }

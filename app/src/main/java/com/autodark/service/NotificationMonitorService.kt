@@ -36,10 +36,10 @@ import java.util.UUID
     private val registry = LifecycleRegistry(this)
 
     private fun sendBroadcast(message: String) {
-        LogUtils.log(Log.DEBUG,kTag, "发送打卡结果到Main activity:$message")
-        val intent = Intent("com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION")
+        LogUtils.log(Log.DEBUG,kTag, "发送打卡结果到mqtt:$message")
+        val intent = Intent("com.example.MQTT_PUBLISH_DARK_RESULT")
         intent.putExtra("message", message)
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent) // 发送本地广播
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent) // 发送广播
     }
 
     override fun getLifecycle(): Lifecycle {
