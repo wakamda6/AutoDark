@@ -14,7 +14,6 @@ import android.view.WindowManager
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.autodark.BaseApplication
 import com.autodark.MqttConfigHolder
 import com.autodark.adapter.BaseFragmentAdapter
@@ -61,10 +60,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     private lateinit var insetsController: WindowInsetsControllerCompat
     private var clickTime: Long = 0
 
-    //广播设置
-    private lateinit var notifyReceiver: BroadcastReceiver
-    val notifyAction  = "com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION"
-
     init {
         fragmentPages.add(SettingsFragment())
     }
@@ -103,24 +98,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         val fragmentAdapter = BaseFragmentAdapter(supportFragmentManager, fragmentPages)
         binding.viewPager.adapter = fragmentAdapter
         binding.viewPager.offscreenPageLimit = fragmentPages.size  // 强制加载所有 Fragment
-
-        // 创建并注册本地广播接收器
-        notifyReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                // 处理接收到的消息
-                val message = intent?.getStringExtra("message")
-                if (intent?.action == notifyAction) {
-                    LogUtils.log(Log.DEBUG,kTag, "收到CountDownTimerManager的通知：$message")
-                    if (message != null) {
-                        if (context != null) {
-                            sendBroadcast(message)
-                        }
-                    }
-                }
-            }
-        }
-        val notifyFilter = IntentFilter(notifyAction)
-        LocalBroadcastManager.getInstance(this).registerReceiver(notifyReceiver, notifyFilter)
 
         //判断证书是否存在，因为涉及文件下载，安卓强制非阻塞
         lifecycleScope.launch(Dispatchers.IO) {
@@ -425,13 +402,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
         // 出现任何错误时返回空字节数组
         return ByteArray(0)
-    }
-
-    private fun sendBroadcast(message: String) {
-        LogUtils.log(Log.DEBUG,kTag, "发送打卡结果到Mqtt服务:$message")
-        val intent = Intent("com.example.MQTT_PUBLISH_DARK_RESULT")
-        intent.putExtra("message", message)
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent) // 发送本地广播
     }
 
     override fun observeRequestState() {

@@ -61,7 +61,7 @@ class MqttService : Service(), Handler.Callback {
     private lateinit var connectivityManager: ConnectivityManager
     private lateinit var networkCallback: ConnectivityManager.NetworkCallback
 
-    //广播器设置
+    //打卡结果广播器设置
     private lateinit var receiver: BroadcastReceiver
     val mqttPushAction = "com.example.MQTT_PUBLISH_DARK_RESULT"
     //重启mqtt连接广播设置
@@ -111,7 +111,7 @@ class MqttService : Service(), Handler.Callback {
                 // 处理接收到的消息
                 val message = intent?.getStringExtra("message")
                 if (intent?.action == mqttPushAction) {
-                    LogUtils.log(Log.DEBUG,kTag, "收到Main activity的发送打卡结果通知：$message")
+                    LogUtils.log(Log.DEBUG,kTag, "收到CountDownTimerManager的发送打卡结果通知：$message")
                     if (message != null) {
                         publishMqttDarkResult(message,1)
                     }

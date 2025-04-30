@@ -90,8 +90,8 @@ class CountDownTimerManager private constructor() : LifecycleOwner {
     }
 
     private fun sendBroadcast(context: Context, message: String) {
-        LogUtils.log(Log.DEBUG,kTag, "发送打卡结果到Main activity:$message")
-        val intent = Intent("com.example.ACTION_CALL_MAIN_ACTIVITY_FUNCTION")
+        LogUtils.log(Log.DEBUG,kTag, "发送打卡结果广播到mqtt服务:$message")
+        val intent = Intent("com.example.MQTT_PUBLISH_DARK_RESULT")
         intent.putExtra("message", message)
         LocalBroadcastManager.getInstance(context).sendBroadcast(intent) // 发送本地广播
     }
