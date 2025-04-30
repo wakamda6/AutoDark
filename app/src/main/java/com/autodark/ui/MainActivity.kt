@@ -192,7 +192,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     }
 
     //证书初始化应该包括下载，监测吊销和解密，所有完成后将ssl句柄传递给mqtt service
-    private fun getAndCheckCA(context: Context, ID: String,retried: Boolean = false): String {
+    private fun getAndCheckCA(context: Context, ID: String,retryCount: Int = 0): String {
         val clientEnPath = File(context.filesDir, "$ID.en")
         val caEnPath = File(context.filesDir, "ca.en")
 
@@ -200,16 +200,21 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         val clientEnUrl = "$baseUrl/${ID}.en"
         val caEnUrl = "$baseUrl/ca.en"
 
-        if (!clientEnPath.exists()) {
+        if (retryCount > 0){
             downloadFileSuspend(clientEnUrl, clientEnPath)
-        } else {
-            LogUtils.log(Log.DEBUG, kTag, "客户端证书已存在")
-        }
-
-        if (!caEnPath.exists()) {
             downloadFileSuspend(caEnUrl, caEnPath)
-        }else {
-            LogUtils.log(Log.DEBUG, kTag, "CA证书已存在")
+        }else if (retryCount == 0){
+            if (!clientEnPath.exists()) {
+                downloadFileSuspend(clientEnUrl, clientEnPath)
+            } else {
+                LogUtils.log(Log.DEBUG, kTag, "客户端证书已存在")
+            }
+
+            if (!caEnPath.exists()) {
+                downloadFileSuspend(caEnUrl, caEnPath)
+            }else {
+                LogUtils.log(Log.DEBUG, kTag, "CA证书已存在")
+            }
         }
 
         if (!clientEnPath.exists() || !caEnPath.exists()) {
@@ -258,46 +263,52 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
             if (crl.isRevoked(clientCert)) {
                 LogUtils.log(Log.WARN, kTag, "客户端证书已被吊销,重新下载证书验证")
-                if (retried) {
-                    LogUtils.log(Log.ERROR, kTag, "证书吊销验证失败，已重试过一次")
-                    return "CAisRevoked"
-                }
-                downloadFileSuspend(clientEnUrl, clientEnPath)
-                downloadFileSuspend(caEnUrl, caEnPath)
-
-                val result = getAndCheckCA(context, ID,retried = true)
-                return if (result != "CASuccess") {
-                    LogUtils.log(Log.WARN, kTag, "验证失败")
+//                if (retried) {
+//                    LogUtils.log(Log.ERROR, kTag, "证书吊销验证失败，已重试过一次")
+//                    return "CAisRevoked"
+//                }
+//                downloadFileSuspend(clientEnUrl, clientEnPath)
+//                downloadFileSuspend(caEnUrl, caEnPath)
+//
+//                val result = getAndCheckCA(context, ID,retried = true)
+//                return if (result != "CASuccess") {
+//                    LogUtils.log(Log.WARN, kTag, "验证失败")
+//                    "CAisRevoked"
+//                }else{
+//                    LogUtils.log(Log.INFO, kTag, "验证成功")
+//                    "CASuccess"
+//                }
+                return if (retryCount >= 3) {
+                    LogUtils.log(Log.ERROR, kTag, "证书吊销验证失败，已达最大重试次数")
                     "CAisRevoked"
-                }else{
-                    LogUtils.log(Log.INFO, kTag, "验证成功")
-                    "CASuccess"
-                }
-
-
-            } else {
-                LogUtils.log(Log.INFO, kTag, "客户端证书有效，未被吊销")
-                // 计算剩余天数
-                val now = Date()
-                val notAfter = clientCert.notAfter
-                val diffInMillies = notAfter.time - now.time
-                if (diffInMillies <= 0) {
-                    // 证书已过期
-                    days = 0
-                    hours = 0
-                    LogUtils.log(Log.WARN,kTag, "证书已过期")
-                    return "CAisTimeout"
                 } else {
-                    days = TimeUnit.MILLISECONDS.toDays(diffInMillies)
-                    hours = TimeUnit.MILLISECONDS.toHours(diffInMillies) % 24
-
-                    val times = "剩余时长:"+days+"天"+hours+"小时"
-                    runOnUiThread {
-                        times.show(this@MainActivity)
-                    }
+                    getAndCheckCA(context, ID, retryCount + 1)
                 }
-                LogUtils.log(Log.DEBUG,kTag, "证书剩余时间：$days 天 $hours 小时")
+
             }
+
+            LogUtils.log(Log.INFO, kTag, "客户端证书有效，未被吊销")
+            // 计算剩余天数
+            val now = Date()
+            val notAfter = clientCert.notAfter
+            val diffInMillies = notAfter.time - now.time
+            if (diffInMillies <= 0) {
+                // 证书已过期
+                days = 0
+                hours = 0
+                LogUtils.log(Log.WARN,kTag, "证书已过期")
+                return "CAisTimeout"
+            } else {
+                days = TimeUnit.MILLISECONDS.toDays(diffInMillies)
+                hours = TimeUnit.MILLISECONDS.toHours(diffInMillies) % 24
+
+                val times = "剩余时长:"+days+"天"+hours+"小时"
+                runOnUiThread {
+                    times.show(this@MainActivity)
+                }
+            }
+            LogUtils.log(Log.DEBUG,kTag, "证书剩余时间：$days 天 $hours 小时")
+
         } catch (e: Exception) {
             LogUtils.log(Log.WARN,kTag, "P12 证书加载失败: ${e.message}")
             return "CAisRevoked"
