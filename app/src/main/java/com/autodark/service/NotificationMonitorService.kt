@@ -70,6 +70,12 @@ import java.util.UUID
 
     }
 
+    override fun onListenerDisconnected() {
+        LogUtils.log(Log.DEBUG,kTag, "通知监听服务已关闭")
+        SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090802)
+        isInitialized = false
+    }
+
     /**
      * 当有新通知到来时会回调
      */
@@ -94,7 +100,7 @@ import java.util.UUID
             LogUtils.log(Log.DEBUG,kTag, "内容 : $notice")
         }
 
-        SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
+//        SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
 
         val notificationBean = com.autodark.bean.NotificationBean().apply {
             uuid = UUID.randomUUID().toString()
@@ -199,11 +205,5 @@ import java.util.UUID
      */
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         LogUtils.log(Log.DEBUG,kTag, "通知已移除")
-    }
-
-    override fun onListenerDisconnected() {
-        LogUtils.log(Log.DEBUG,kTag, "通知监听服务已关闭")
-        SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090802)
-        isInitialized = false
     }
 }
