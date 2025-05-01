@@ -13,6 +13,7 @@ import kotlin.properties.Delegates
 class BaseApplication : Application() {
 
     var androidId: String = ""
+    var CATimes:String = ""
 
     //mqtt设置
     lateinit var mqttServerUrl: String

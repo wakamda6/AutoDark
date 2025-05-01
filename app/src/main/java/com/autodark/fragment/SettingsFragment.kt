@@ -50,6 +50,8 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
 
     var id:String = ""
 
+    var time:String = ""
+
     companion object {
         var weakReferenceHandler: WeakReferenceHandler? = null
     }
@@ -92,6 +94,13 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
         binding.appVersion.text = com.autodark.BuildConfig.VERSION_NAME
         LogUtils.log(Log.DEBUG,kTag,"Fragment 创建，应用版本: ${com.autodark.BuildConfig.VERSION_NAME}")
         val app = requireActivity().application as BaseApplication
+    }
+
+    fun setIdText(time: String) {
+        this.time = time
+        if (isAdded && binding != null) {
+            binding.tvTimeout.text = time  // 替换为你实际 TextView 的 ID
+        }
     }
 
     override fun initEvent() {

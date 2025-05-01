@@ -14,12 +14,24 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="20dp"
+            android:padding="15dp"
+            android:layout_marginTop="5dp"
             android:text="AutoDark"
             android:textSize="24sp"
             android:textColor="@color/colorText"
             android:textStyle="bold"
             android:gravity="center" />
+
+        <!-- 剩余时长 -->
+        <TextView
+            android:id="@+id/tv_timeout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="剩余时长：0天0小时"
+            android:padding="5dp"
+            android:textSize="15sp"
+            android:textColor="#000000"
+            android:gravity="start"/>
 
         <RelativeLayout
             android:id="@+id/emailLayout"

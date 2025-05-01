@@ -47,6 +47,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     private val kTag = "MainActivity"
 
     private var darkID:String = ""
+    private var CATimes:String = ""
 
     //剩余天数
     private var days= 0L
@@ -54,11 +55,12 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
     //页面设置
     private val fragmentPages = ArrayList<Fragment>()
+    private val settingsFragment = SettingsFragment()
     private lateinit var insetsController: WindowInsetsControllerCompat
     private var clickTime: Long = 0
 
     init {
-        fragmentPages.add(SettingsFragment())
+        fragmentPages.add(settingsFragment)
     }
 
 
@@ -87,6 +89,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
         //id获取
         darkID = (applicationContext as BaseApplication).androidId
+        CATimes = (applicationContext as BaseApplication).CATimes
 
         val fragmentAdapter = BaseFragmentAdapter(supportFragmentManager, fragmentPages)
         binding.viewPager.adapter = fragmentAdapter
@@ -102,6 +105,9 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     showRetryDialog(result,this@MainActivity, darkID)
                 }
             }else {
+                if(CATimes.isNotEmpty()){
+                    settingsFragment.setIdText(CATimes)
+                }
                 if(isMqttFirstRun){
                     LogUtils.log(Log.DEBUG, kTag, "第一次启动mqtt")
                     startService(Intent(this@MainActivity, MqttService::class.java))
@@ -151,6 +157,9 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                                 showRetryDialog(result2,context, ID)
                             }
                         }else {
+                            if(CATimes.isNotEmpty()){
+                                settingsFragment.setIdText(CATimes)
+                            }
                             if(isMqttFirstRun){
                                 LogUtils.log(Log.DEBUG, kTag, "第一次启动mqtt")
                                 startService(Intent(this@MainActivity, MqttService::class.java))
@@ -302,10 +311,10 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                 days = TimeUnit.MILLISECONDS.toDays(diffInMillies)
                 hours = TimeUnit.MILLISECONDS.toHours(diffInMillies) % 24
 
-                val times = "剩余时长:"+days+"天"+hours+"小时"
-                runOnUiThread {
-                    times.show(this@MainActivity)
-                }
+                CATimes = "剩余时长:"+days+"天"+hours+"小时"
+//                runOnUiThread {
+//                    CATimes.show(this@MainActivity)
+//                }
             }
             LogUtils.log(Log.DEBUG,kTag, "证书剩余时间：$days 天 $hours 小时")
 
@@ -474,6 +483,9 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     showRetryDialog(result,this@MainActivity, darkID)
                 }
             }else {
+                if(CATimes.isNotEmpty()){
+                    settingsFragment.setIdText(CATimes)
+                }
                 if(!MqttConfigHolder.isconnected) {
                     val intent = Intent("RECONNECT_MQTT")
                     sendBroadcast(intent)
