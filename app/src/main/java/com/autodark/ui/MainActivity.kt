@@ -312,9 +312,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                 hours = TimeUnit.MILLISECONDS.toHours(diffInMillies) % 24
 
                 CATimes = "剩余时长:"+days+"天"+hours+"小时"
-//                runOnUiThread {
-//                    CATimes.show(this@MainActivity)
-//                }
             }
             LogUtils.log(Log.DEBUG,kTag, "证书剩余时间：$days 天 $hours 小时")
 
