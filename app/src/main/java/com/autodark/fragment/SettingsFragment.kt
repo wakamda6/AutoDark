@@ -273,7 +273,9 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
                     LogUtils.log(Log.DEBUG, kTag, "通知监听已授权")
                 }
             } else {
-                LogUtils.log(Log.DEBUG, kTag, "关闭开关")
+                LogUtils.log(Log.DEBUG, kTag, "关闭开关，跳转到设置取消通知监听权限")
+                val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                startActivity(intent)
             }
         }
 

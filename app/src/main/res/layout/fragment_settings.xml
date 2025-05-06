@@ -103,6 +103,28 @@
 
         <RelativeLayout
             android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:background="@color/white"
+            android:paddingHorizontal="10dp">
+
+            <TextView
+                android:id="@+id/tv_notify"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:text="请注意:\n        在设置中搜索自启动和省电策略,\n       将AutoDark设置为自启动和省电策略无限制以保证使用效果"
+                android:textColor="@color/red"
+                android:textSize="12sp" />
+        </RelativeLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1px"
+            android:layout_marginHorizontal="@dimen/dp_10"
+            android:background="#CCC" />
+
+        <RelativeLayout
+            android:layout_width="match_parent"
             android:layout_height="@dimen/itemLayoutHeight"
             android:background="@color/white"
             android:paddingHorizontal="10dp">
