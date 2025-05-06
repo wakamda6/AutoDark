@@ -50,7 +50,7 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
 
     var id:String = ""
 
-    var time:String = ""
+    private var time:String = ""
 
     companion object {
         var weakReferenceHandler: WeakReferenceHandler? = null
@@ -93,44 +93,16 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
         weakReferenceHandler = WeakReferenceHandler(this)
         binding.appVersion.text = com.autodark.BuildConfig.VERSION_NAME
         LogUtils.log(Log.DEBUG,kTag,"Fragment 创建，应用版本: ${com.autodark.BuildConfig.VERSION_NAME}")
-        val app = requireActivity().application as BaseApplication
     }
 
     fun setIdText(time: String) {
         this.time = time
-        if (isAdded && binding != null) {
-            binding.tvTimeout.text = time  // 替换为你实际 TextView 的 ID
+        if (isAdded) {
+            binding.tvTimeout.text = time
         }
     }
 
     override fun initEvent() {
-//        binding.sendEmailLayout.setOnClickListener{
-//            LogUtils.log(Log.DEBUG,kTag,"发送邮箱布局点击事件触发")
-//            AlertInputDialog.Builder()
-//                .setContext(requireContext())
-//                .setTitle("设置发送邮箱")
-//                .setHintMessage("请输入发送邮箱")
-//                .setNegativeButton("取消")
-//                .setPositiveButton("确定")
-//                .setOnDialogButtonClickListener(object :
-//                    AlertInputDialog.OnDialogButtonClickListener {
-//                    override fun onConfirmClick(value: String) {
-//                        if (!TextUtils.isEmpty(value)) {
-//                            LogUtils.log(Log.DEBUG,kTag,"发送邮箱设置为: $value")
-//                            SaveKeyValues.putValue(Constant.EMAIL_ADDRESS, value)
-//                            binding.emailTextView.text = value
-//                        } else {
-//                            LogUtils.log(Log.DEBUG,kTag,"发送邮箱输入为空")
-//                            "什么都还没输入呢！".show(requireContext())
-//                        }
-//                    }
-//
-//                    override fun onCancelClick() {
-//                        LogUtils.log(Log.DEBUG,kTag,"发送邮箱设置取消")
-//                    }
-//                }).build().show()
-//        }
-
         binding.emailLayout.setOnClickListener {
             LogUtils.log(Log.DEBUG,kTag,"接收邮箱布局点击事件触发")
             AlertInputDialog.Builder()
@@ -146,14 +118,6 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
                             LogUtils.log(Log.DEBUG,kTag,"接收邮箱设置为: $value")
                             SaveKeyValues.putValue(Constant.EMAIL_ADDRESS, value)
                             binding.emailTextView.text = value
-
-//                            //发送订阅主题
-//                            lifecycleScope.launch(Dispatchers.IO) {
-//                                topicMessageToSend.createTextMail(
-//                                    "控制手机需要订阅的主题", value
-//                                )?.sendTextMail()
-//                                LogUtils.log(Log.DEBUG, kTag, "发送主题成功")
-//                            }
                         } else {
                             LogUtils.log(Log.DEBUG,kTag,"接收邮箱输入为空")
                             "什么都还没输入呢！".show(requireContext())
@@ -165,33 +129,6 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
                     }
                 }).build().show()
         }
-
-//        binding.emailTitleLayout.setOnClickListener {
-//            LogUtils.log(Log.DEBUG,kTag,"邮件标题布局被点击")
-//            AlertInputDialog.Builder()
-//                .setContext(requireContext())
-//                .setTitle("设置邮件标题")
-//                .setHintMessage("请输入邮件标题")
-//                .setNegativeButton("取消")
-//                .setPositiveButton("确定")
-//                .setOnDialogButtonClickListener(object :
-//                    AlertInputDialog.OnDialogButtonClickListener {
-//                    override fun onConfirmClick(value: String) {
-//                        if (!TextUtils.isEmpty(value)) {
-//                            LogUtils.log(Log.DEBUG,kTag,"邮件标题设置为: $value")
-//                            SaveKeyValues.putValue(Constant.EMAIL_TITLE, value)
-//                            binding.emailTitleView.text = value
-//                        } else {
-//                            LogUtils.log(Log.DEBUG,kTag,"邮件标题输入为空")
-//                            "什么都还没输入呢！".show(requireContext())
-//                        }
-//                    }
-//
-//                    override fun onCancelClick() {
-//                        LogUtils.log(Log.DEBUG,kTag,"邮件标题设置取消")
-//                    }
-//                }).build().show()
-//        }
 
         binding.timeoutLayout.setOnClickListener {
             LogUtils.log(Log.DEBUG,kTag,"超时布局被点击")
@@ -214,33 +151,6 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
                     }
                 }).build().show()
         }
-
-//        binding.keyLayout.setOnClickListener {
-//            LogUtils.log(Log.DEBUG,kTag, "打卡口令布局被点击")
-//            AlertInputDialog.Builder()
-//                .setContext(requireContext())
-//                .setTitle("设置打卡口令")
-//                .setHintMessage("请输入打卡口令，如：打卡")
-//                .setNegativeButton("取消")
-//                .setPositiveButton("确定")
-//                .setOnDialogButtonClickListener(object :
-//                    AlertInputDialog.OnDialogButtonClickListener {
-//                    override fun onConfirmClick(value: String) {
-//                        if (!TextUtils.isEmpty(value)) {
-//                            LogUtils.log(Log.DEBUG,kTag,"打卡口令设置为: $value")
-//                            SaveKeyValues.putValue(Constant.DING_DING_KEY, value)
-//                            binding.keyTextView.text = value
-//                        } else {
-//                            LogUtils.log(Log.DEBUG,kTag,"打卡口令输入为空")
-//                            "什么都还没输入呢！".show(requireContext())
-//                        }
-//                    }
-//
-//                    override fun onCancelClick() {
-//                        LogUtils.log(Log.DEBUG,kTag,"打卡口令设置取消")
-//                    }
-//                }).build().show()
-//        }
 
         binding.floatSwitch.setOnClickListener {
             LogUtils.log(Log.DEBUG, kTag, "悬浮开关被点击，当前状态: ${binding.floatSwitch.isChecked}")
@@ -442,25 +352,13 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
         super.onResume()
         LogUtils.log(Log.DEBUG,kTag,"onResume 被调用")
 
-//        val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
-//        binding.emailTextView.text = emailAddress
-//        LogUtils.log(Log.DEBUG,kTag,"发送邮箱地址更新为: $emailAddress")
-
         val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
         binding.emailTextView.text = emailAddress
         LogUtils.log(Log.DEBUG,kTag,"邮箱地址更新为: $emailAddress")
 
-//        val emailTitle = SaveKeyValues.getValue(Constant.EMAIL_TITLE, "打卡结果通知") as String
-//        binding.emailTitleView.text = emailTitle
-//        LogUtils.log(Log.DEBUG,kTag,"邮件标题更新为: $emailTitle")
-
         val timeout = SaveKeyValues.getValue(Constant.TIMEOUT, "15s") as String
         binding.timeoutTextView.text = timeout
         LogUtils.log(Log.DEBUG,kTag,"超时设置更新为: $timeout")
-
-//        val dingDingKey = SaveKeyValues.getValue(Constant.DING_DING_KEY, "打卡") as String
-//        binding.keyTextView.text = dingDingKey
-//        LogUtils.log(Log.DEBUG,kTag,"打卡口令更新为: $dingDingKey")
 
         binding.floatSwitch.isChecked = Settings.canDrawOverlays(requireContext())
         LogUtils.log(Log.DEBUG,kTag,"悬浮开关状态: ${binding.floatSwitch.isChecked}")
