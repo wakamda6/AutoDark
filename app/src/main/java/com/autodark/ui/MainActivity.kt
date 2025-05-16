@@ -482,8 +482,10 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             }else {
                 if(CATimes.isNotEmpty()){
                     settingsFragment.setIdText(CATimes)
+                    LogUtils.log(Log.DEBUG, kTag, "设置证书时间")
                 }
                 if(!MqttConfigHolder.isconnected) {
+                    LogUtils.log(Log.WARN, kTag, "mqtt未连接，开始重连")
                     val intent = Intent("RECONNECT_MQTT")
                     sendBroadcast(intent)
                 }

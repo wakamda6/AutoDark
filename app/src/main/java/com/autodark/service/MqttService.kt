@@ -175,7 +175,6 @@ class MqttService : Service(), Handler.Callback {
 
     private fun reconnectMqtt() {
         LogUtils.log(Log.DEBUG,kTag, "尝试重连mqtt")
-
         mqttClient.disconnect()
         connectToMqtt()
     }
@@ -191,7 +190,7 @@ class MqttService : Service(), Handler.Callback {
 
         mqttClient = MqttAndroidClient(applicationContext, mqttServerUrl, mqttClientId, Ack.AUTO_ACK)
         val options = MqttConnectOptions().apply {
-            isCleanSession = true
+            isCleanSession = false
             connectionTimeout = 10
             keepAliveInterval = 30
             userName = user
@@ -256,6 +255,22 @@ class MqttService : Service(), Handler.Callback {
                     LogUtils.log(Log.ERROR, kTag, "MQTT 连接断开，原因未知")
                 }
                 isconnected = false
+
+                if (cause != null) {
+                    if (cause.message?.contains("certificate verify failed") == true) {
+                        try {
+                            mqttClient.disconnectForcibly()
+                            mqttClient.disconnect()
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+
+                        // 稍后重新连接
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            connectToMqtt()
+                        }, 2000)
+                    }
+                }
             }
 
             override fun connectComplete(reconnect: Boolean, serverURI: String?) {
