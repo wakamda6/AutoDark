@@ -1,11 +1,54 @@
 package com.autodark
 
+import android.util.Log
+import com.autodark.utils.LogUtils
+import java.security.KeyStore
+import java.security.cert.CertificateFactory
+import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManagerFactory
 
 object MqttConfigHolder {
+    private var lastSslHash: String? = null
     var mqttSslContext: SSLContext? = null
+        private set
 
-    var isconnected: Boolean = false
+    fun initSslContextIfNeeded(p12Bytes: ByteArray, p12Password: CharArray, caBytes: ByteArray): Boolean {
+        val newHash = (p12Bytes.contentHashCode().toString() + caBytes.contentHashCode().toString())
 
-    var isMqttFirstRun:Boolean = true
+        if (newHash == lastSslHash && mqttSslContext != null) {
+            LogUtils.log(Log.DEBUG, "SslInitializer", "SSLContext 无需重新初始化")
+            return false
+        }
+
+        return try {
+            // 客户端证书
+            val keyStore = KeyStore.getInstance("PKCS12").apply {
+                load(p12Bytes.inputStream(), p12Password)
+            }
+            val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm()).apply {
+                init(keyStore, p12Password)
+            }
+
+            // CA证书
+            val caCertificate = CertificateFactory.getInstance("X.509").generateCertificate(caBytes.inputStream())
+            val caKeyStore = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
+                load(null, null)
+                setCertificateEntry("ca", caCertificate)
+            }
+            val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply {
+                init(caKeyStore)
+            }
+
+            mqttSslContext = SSLContext.getInstance("TLSv1.3").apply {
+                init(keyManagerFactory.keyManagers, trustManagerFactory.trustManagers, null)
+            }
+            lastSslHash = newHash
+            LogUtils.log(Log.DEBUG, "SslInitializer", "SSLContext 初始化成功")
+            true
+        } catch (e: Exception) {
+            LogUtils.log(Log.ERROR, "SslInitializer", "SSLContext 初始化失败: ${e.message}")
+            false
+        }
+    }
 }

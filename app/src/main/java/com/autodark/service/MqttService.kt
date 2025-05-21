@@ -25,8 +25,6 @@ import com.pengxh.kt.lite.utils.WeakReferenceHandler
 import android.content.Context
 import com.autodark.BaseApplication
 import com.autodark.MqttConfigHolder
-import com.autodark.MqttConfigHolder.isMqttFirstRun
-import com.autodark.MqttConfigHolder.isconnected
 import java.io.*
 
 /**
@@ -65,12 +63,8 @@ class MqttService : Service(), Handler.Callback {
     //打卡结果广播器设置
     private lateinit var receiver: BroadcastReceiver
     val mqttPushAction = "com.example.MQTT_PUBLISH_DARK_RESULT"
-    //重启mqtt连接广播设置
-    private lateinit var reconnectReceiver: BroadcastReceiver
-    val reconnect  = "RECONNECT_MQTT"
 
     override fun onCreate() {
-        isMqttFirstRun = false
         id = (applicationContext as BaseApplication).androidId
 
         // MQTT 配置文件导入
@@ -123,15 +117,6 @@ class MqttService : Service(), Handler.Callback {
         val mqttFilter = IntentFilter(mqttPushAction)
         LocalBroadcastManager.getInstance(this).registerReceiver(receiver, mqttFilter)
 
-        //重连广播
-        reconnectReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                if (intent.action == reconnect) {
-                    reconnectMqtt()
-                }
-            }
-        }
-
         // 初始化网络相关配置
         connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         networkCallback = object : ConnectivityManager.NetworkCallback() {
@@ -173,26 +158,20 @@ class MqttService : Service(), Handler.Callback {
         notificationManager?.notify(notificationId, notification)
     }
 
-    private fun reconnectMqtt() {
-        LogUtils.log(Log.DEBUG,kTag, "尝试重连mqtt")
-        mqttClient.disconnect()
-        connectToMqtt()
-    }
     private fun connectToMqtt() {
         LogUtils.log(Log.DEBUG,kTag, "尝试连接到 MQTT 代理")
 
         // 确保网络连接
         if (!NetworkUtils.isNetworkAvailable(this)) {
             LogUtils.log(Log.WARN,kTag, "网络不可用，无法连接到 MQTT 代理")
-            isconnected = false
             return
         }
 
         mqttClient = MqttAndroidClient(applicationContext, mqttServerUrl, mqttClientId, Ack.AUTO_ACK)
         val options = MqttConnectOptions().apply {
             isCleanSession = false
-            connectionTimeout = 10
-            keepAliveInterval = 30
+            connectionTimeout = 20
+            keepAliveInterval = 60
             userName = user
             password = pwd.toCharArray()
 
@@ -220,7 +199,6 @@ class MqttService : Service(), Handler.Callback {
                     val topicsToSubscribe = arrayOf(mqttTopicCheckAppAlive,mqttTopicDark)
                     val qosLevels = intArrayOf(1,1) // QoS 级别
                     subscribeToTopics(topicsToSubscribe, qosLevels) // 连接成功后订阅主题
-                    isconnected = true
                 }
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
@@ -236,7 +214,6 @@ class MqttService : Service(), Handler.Callback {
                         // 其他异常类型
                         LogUtils.log(Log.ERROR, kTag, "未知错误: ${exception?.message}")
                     }
-                    isconnected =false
                 }
             })
         } catch (e: MqttException) {
@@ -254,31 +231,12 @@ class MqttService : Service(), Handler.Callback {
                 } else {
                     LogUtils.log(Log.ERROR, kTag, "MQTT 连接断开，原因未知")
                 }
-                isconnected = false
-
-                if (cause != null) {
-                    if (cause.message?.contains("certificate verify failed") == true) {
-                        try {
-                            mqttClient.disconnectForcibly()
-                            mqttClient.disconnect()
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
-
-                        // 稍后重新连接
-                        Handler(Looper.getMainLooper()).postDelayed({
-                            connectToMqtt()
-                        }, 2000)
-                    }
-                }
             }
 
             override fun connectComplete(reconnect: Boolean, serverURI: String?) {
                 if (reconnect) {
-                    isconnected = true
                     LogUtils.log(Log.INFO, kTag, "重连成功")
                 } else {
-                    isconnected = true
                     LogUtils.log(Log.INFO, kTag, "初次连接成功")
                     return
                 }
@@ -385,7 +343,6 @@ class MqttService : Service(), Handler.Callback {
             unsubscribeFromTopics(arrayOf(mqttTopicCheckAppAlive, mqttTopicDark))
             //断开连接
             mqttClient.disconnect()
-            isconnected = false
             // 注销网络回调
             connectivityManager.unregisterNetworkCallback(networkCallback)
             weakReferenceHandler.removeCallbacksAndMessages(null)

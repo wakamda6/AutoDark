@@ -16,7 +16,6 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import com.autodark.BaseApplication
 import com.autodark.MqttConfigHolder
-import com.autodark.MqttConfigHolder.isMqttFirstRun
 import com.autodark.adapter.BaseFragmentAdapter
 import com.autodark.extensions.initImmersionBar
 import com.autodark.service.MqttService
@@ -37,9 +36,6 @@ import javax.crypto.Cipher
 import javax.crypto.CipherInputStream
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
-import javax.net.ssl.KeyManagerFactory
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManagerFactory
 import kotlin.collections.ArrayList
 
 class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
@@ -47,7 +43,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     private val kTag = "MainActivity"
 
     private var darkID:String = ""
-    private var CATimes:String = ""
+    private var caTimes:String = ""
 
     //剩余天数
     private var days= 0L
@@ -89,7 +85,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
         //id获取
         darkID = (applicationContext as BaseApplication).androidId
-        CATimes = (applicationContext as BaseApplication).CATimes
+        caTimes = (applicationContext as BaseApplication).caTimes
 
         val fragmentAdapter = BaseFragmentAdapter(supportFragmentManager, fragmentPages)
         binding.viewPager.adapter = fragmentAdapter
@@ -105,19 +101,10 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     showRetryDialog(result,this@MainActivity, darkID)
                 }
             }else {
-                if(CATimes.isNotEmpty()){
-                    settingsFragment.setIdText(CATimes)
+                if(caTimes.isNotEmpty()){
+                    settingsFragment.setIdText(caTimes)
                 }
-                if(isMqttFirstRun){
-                    LogUtils.log(Log.DEBUG, kTag, "第一次启动mqtt")
-                    startService(Intent(this@MainActivity, MqttService::class.java))
-                }else{
-                    if(!MqttConfigHolder.isconnected) {
-                        LogUtils.log(Log.DEBUG, kTag, "mqtt重连")
-                        val intent = Intent("RECONNECT_MQTT")
-                        sendBroadcast(intent)
-                    }
-                }
+                startService(Intent(this@MainActivity, MqttService::class.java))
             }
         }
     }
@@ -157,19 +144,10 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                                 showRetryDialog(result2,context, ID)
                             }
                         }else {
-                            if(CATimes.isNotEmpty()){
-                                settingsFragment.setIdText(CATimes)
+                            if(caTimes.isNotEmpty()){
+                                settingsFragment.setIdText(caTimes)
                             }
-                            if(isMqttFirstRun){
-                                LogUtils.log(Log.DEBUG, kTag, "第一次启动mqtt")
-                                startService(Intent(this@MainActivity, MqttService::class.java))
-                            }else{
-                                if(!MqttConfigHolder.isconnected) {
-                                    LogUtils.log(Log.DEBUG, kTag, "mqtt重连")
-                                    val intent = Intent("RECONNECT_MQTT")
-                                    sendBroadcast(intent)
-                                }
-                            }
+                            startService(Intent(this@MainActivity, MqttService::class.java))
                         }
                     }
                 }
@@ -201,18 +179,17 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     }
 
     //证书初始化应该包括下载，监测吊销和解密，所有完成后将ssl句柄传递给mqtt service
-    private fun getAndCheckCA(context: Context, ID: String,retryCount: Int = 0): String {
+    private fun getAndCheckCA(context: Context, ID: String, retryCount: Int = 0): String {
         val clientEnPath = File(context.filesDir, "$ID.en")
         val caEnPath = File(context.filesDir, "ca.en")
-
         val baseUrl = "https://***REMOVED***/certs/${ID}/en_${ID}"
         val clientEnUrl = "$baseUrl/${ID}.en"
         val caEnUrl = "$baseUrl/ca.en"
 
-        if (retryCount > 0){
+        if (retryCount > 0) {
             downloadFileSuspend(clientEnUrl, clientEnPath)
             downloadFileSuspend(caEnUrl, caEnPath)
-        }else if (retryCount == 0){
+        } else {
             if (!clientEnPath.exists()) {
                 downloadFileSuspend(clientEnUrl, clientEnPath)
             } else {
@@ -221,7 +198,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
             if (!caEnPath.exists()) {
                 downloadFileSuspend(caEnUrl, caEnPath)
-            }else {
+            } else {
                 LogUtils.log(Log.DEBUG, kTag, "CA证书已存在")
             }
         }
@@ -234,121 +211,62 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         val key = generateKeyFromString(ID)
         if (key.isEmpty()) {
             LogUtils.log(Log.ERROR, kTag, "密钥生成失败")
-            // 处理解密失败的情况，比如返回或终止操作
             return "CAGetFailed"
         }
 
-        val p12Bytes = FileInputStream(clientEnPath).use { inputStream ->
-            aesDecryptInMemory(inputStream, key)
-        }
+        val p12Bytes = FileInputStream(clientEnPath).use { aesDecryptInMemory(it, key) }
         if (p12Bytes.isEmpty()) {
             LogUtils.log(Log.ERROR, kTag, "解密证书文件失败")
             return "CAGetFailed"
         }
-        val caBytes = FileInputStream(caEnPath).use { inputStream ->
-            aesDecryptInMemory(inputStream, key)
-        }
+
+        val caBytes = FileInputStream(caEnPath).use { aesDecryptInMemory(it, key) }
         if (caBytes.isEmpty()) {
             LogUtils.log(Log.ERROR, kTag, "解密 CA 文件失败")
             return "CAGetFailed"
         }
 
-        // 加载 .p12 文件
+        // 加载证书验证
         val p12P = ID.toCharArray()
         val keyStore = KeyStore.getInstance("PKCS12")
-        val p12InputStream = p12Bytes.inputStream()
         try {
-            keyStore.load(p12InputStream, p12P)
-            LogUtils.log(Log.INFO,kTag, "P12 证书加载成功")
-
-            // 吊销验证
-            val alias = keyStore.aliases().nextElement() // 获取 p12 中的第一个别名
+            keyStore.load(p12Bytes.inputStream(), p12P)
+            val alias = keyStore.aliases().nextElement()
             val clientCert = keyStore.getCertificate(alias) as X509Certificate
 
-            val crlUrl = URL("https://***REMOVED***/crl/crl.pem")
-            val crlStream = crlUrl.openStream()
-            val cf = CertificateFactory.getInstance("X.509")
-            val crl = cf.generateCRL(crlStream) as X509CRL
+            val crl = CertificateFactory.getInstance("X.509")
+                .generateCRL(URL("https://***REMOVED***/crl/crl.pem").openStream()) as X509CRL
 
             if (crl.isRevoked(clientCert)) {
                 LogUtils.log(Log.WARN, kTag, "客户端证书已被吊销,重新下载证书验证")
-//                if (retried) {
-//                    LogUtils.log(Log.ERROR, kTag, "证书吊销验证失败，已重试过一次")
-//                    return "CAisRevoked"
-//                }
-//                downloadFileSuspend(clientEnUrl, clientEnPath)
-//                downloadFileSuspend(caEnUrl, caEnPath)
-//
-//                val result = getAndCheckCA(context, ID,retried = true)
-//                return if (result != "CASuccess") {
-//                    LogUtils.log(Log.WARN, kTag, "验证失败")
-//                    "CAisRevoked"
-//                }else{
-//                    LogUtils.log(Log.INFO, kTag, "验证成功")
-//                    "CASuccess"
-//                }
                 return if (retryCount >= 3) {
                     LogUtils.log(Log.ERROR, kTag, "证书吊销验证失败，已达最大重试次数")
                     "CAisRevoked"
                 } else {
                     getAndCheckCA(context, ID, retryCount + 1)
                 }
-
             }
 
-            LogUtils.log(Log.INFO, kTag, "客户端证书有效，未被吊销")
-            // 计算剩余天数
             val now = Date()
-            val notAfter = clientCert.notAfter
-            val diffInMillies = notAfter.time - now.time
+            val diffInMillies = clientCert.notAfter.time - now.time
             if (diffInMillies <= 0) {
-                // 证书已过期
                 days = 0
                 hours = 0
-                LogUtils.log(Log.WARN,kTag, "证书已过期")
+                LogUtils.log(Log.WARN, kTag, "证书已过期")
                 return "CAisTimeout"
             } else {
                 days = TimeUnit.MILLISECONDS.toDays(diffInMillies)
                 hours = TimeUnit.MILLISECONDS.toHours(diffInMillies) % 24
-
-                CATimes = "剩余时长:"+days+"天"+hours+"小时"
+                caTimes = "剩余时长:${days}天${hours}小时"
             }
-            LogUtils.log(Log.DEBUG,kTag, "证书剩余时间：$days 天 $hours 小时")
 
         } catch (e: Exception) {
-            LogUtils.log(Log.WARN,kTag, "P12 证书加载失败: ${e.message}")
+            LogUtils.log(Log.WARN, kTag, "P12 证书加载失败: ${e.message}")
             return "CAisRevoked"
         }
 
-        // 创建 KeyManagerFactory 来管理客户端证书和私钥
-        val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
-        keyManagerFactory.init(keyStore, p12P)
-
-        // 加载 CA 根证书
-        val caInputStream = caBytes.inputStream()
-        val certificateFactory = CertificateFactory.getInstance("X.509")
-        val caCertificate = certificateFactory.generateCertificate(caInputStream)
-
-        // 创建一个包含 CA 证书的 KeyStore
-        val caKeyStore = KeyStore.getInstance(KeyStore.getDefaultType())
-        caKeyStore.load(null, null)
-        caKeyStore.setCertificateEntry("ca", caCertificate)
-
-        // 初始化 TrustManagerFactory
-        val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-        trustManagerFactory.init(caKeyStore)
-        //trustManagerFactory.init(null as KeyStore?)  // 默认使用系统信任的证书.不使用系统默认证书，保证内网通信
-
-        // SSLContext 设置
-        try {
-            MqttConfigHolder.mqttSslContext = SSLContext.getInstance("TLSv1.3").apply {
-                init(keyManagerFactory.keyManagers, trustManagerFactory.trustManagers, null)
-            }
-            LogUtils.log(Log.DEBUG,kTag, "mqttSslContext 初始化成功")
-        } catch (e: Exception) {
-            LogUtils.log(Log.WARN,kTag, "mqttSslContext 初始化失败: ${e.message}")
-            return "CAGetFailed"
-        }
+        // 初始化 SSL
+        val sslInitSuccess = MqttConfigHolder.initSslContextIfNeeded(p12Bytes, p12P, caBytes)
 
         return "CASuccess"
     }
@@ -480,14 +398,9 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     showRetryDialog(result,this@MainActivity, darkID)
                 }
             }else {
-                if(CATimes.isNotEmpty()){
-                    settingsFragment.setIdText(CATimes)
+                if(caTimes.isNotEmpty()){
+                    settingsFragment.setIdText(caTimes)
                     LogUtils.log(Log.DEBUG, kTag, "设置证书时间")
-                }
-                if(!MqttConfigHolder.isconnected) {
-                    LogUtils.log(Log.WARN, kTag, "mqtt未连接，开始重连")
-                    val intent = Intent("RECONNECT_MQTT")
-                    sendBroadcast(intent)
                 }
             }
         }

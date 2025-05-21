@@ -135,6 +135,7 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
         if (packageName == Constant.DING_DING) {
             if (notice.contains("成功")) {
                 lifecycleScope.launch(Dispatchers.Main) {
+                    delay(1000)
                     backToMainActivity()
                 }
                 // 发送打卡成功的邮件

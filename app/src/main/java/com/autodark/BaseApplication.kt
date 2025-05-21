@@ -1,10 +1,7 @@
 package com.autodark
 
 import android.app.Application
-import android.content.Context
 import android.provider.Settings
-import android.util.Log
-import com.autodark.utils.LogUtils
 import com.pengxh.kt.lite.utils.SaveKeyValues
 import com.tencent.bugly.crashreport.CrashReport
 import info.mqtt.android.service.MqttAndroidClient
@@ -13,7 +10,7 @@ import kotlin.properties.Delegates
 class BaseApplication : Application() {
 
     var androidId: String = ""
-    var CATimes:String = ""
+    var caTimes:String = ""
 
     //mqtt设置
     lateinit var mqttServerUrl: String
