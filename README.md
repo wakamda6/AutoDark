@@ -1,9 +1,7 @@
 # AutoDark
 
 ## 版本信息
-![版本](https://img.shields.io/badge/version-v2.0.1.2-blue)
-
-发布日期: 2025-04-18
+![版本](https://img.shields.io/badge/version-v2.0.1.5-blue)
 
 [查看完整版本日志](CHANGELOG.md)
 
@@ -28,7 +26,6 @@
 
 1. 需要备用手机
 2. 需要打卡环境有网
-3. 需要充电才能达到最大效果
 
 ## 致谢
 
