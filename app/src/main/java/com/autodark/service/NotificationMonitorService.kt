@@ -78,7 +78,6 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
                 LogUtils.log(Log.DEBUG, kTag, "通知监听服务已经初始化,不再初始化...")
             }
         } catch (e: Exception) {
-            LogUtils.log(Log.ERROR, kTag, "发生异常: ${e.message}")
             // 可清除标记以允许下次初始化
             getSharedPreferences("service_prefs", Context.MODE_PRIVATE)
                 .edit().remove("is_initialized").apply()
@@ -86,7 +85,6 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
     }
 
     override fun onListenerDisconnected() {
-        LogUtils.log(Log.DEBUG,kTag, "通知监听服务已关闭")
         SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090802)
         clearServiceInitialized()
     }
