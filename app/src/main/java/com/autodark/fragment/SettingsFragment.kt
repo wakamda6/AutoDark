@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -34,6 +35,7 @@ import com.autodark.utils.LogUtils
 import android.util.Log
 import android.view.*
 import android.widget.ImageView
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import com.autodark.BaseApplication
 import com.autodark.extensions.*
@@ -51,6 +53,8 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
     var id:String = ""
 
     private var time:String = ""
+
+    private var screenCoverView: View? = null
 
     companion object {
         var weakReferenceHandler: WeakReferenceHandler? = null
@@ -217,10 +221,13 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
             if (isChecked) {
                 LogUtils.log(Log.DEBUG,kTag, "设置为最低亮度")
                 requireActivity().window.setScreenBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_OFF)
-            } else {
-                LogUtils.log(Log.DEBUG,kTag, "恢复默认亮度")
-                requireActivity().window.setScreenBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
+                // 显示黑色遮罩 + 禁用触摸
+                showScreenCover()
             }
+//            else {
+//                LogUtils.log(Log.DEBUG,kTag, "恢复默认亮度")
+//                requireActivity().window.setScreenBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
+//            }
         }
 
         binding.backToHomeSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -250,6 +257,51 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
             // 设置二维码到 ImageView
             showQRCodeDialog(bitmap)
         }
+    }
+
+    //防误触黑屏
+    private fun showScreenCover() {
+        if (screenCoverView != null) return
+
+        val textView = TextView(requireContext()).apply {
+            setBackgroundColor(Color.BLACK)
+            text = "长按屏幕解锁"
+            setTextColor(Color.WHITE)
+            textSize = 18f
+            gravity = Gravity.CENTER
+            isClickable = true // 阻止触摸事件传递
+            isFocusable = true
+
+            setOnLongClickListener {
+                removeScreenCover()
+                true
+            }
+        }
+
+        screenCoverView = textView
+
+        val params = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
+
+        (requireActivity().window.decorView as ViewGroup).addView(screenCoverView, params)
+    }
+
+    //取消防误触
+    private fun removeScreenCover() {
+        screenCoverView?.let {
+            (requireActivity().window.decorView as ViewGroup).removeView(it)
+            screenCoverView = null
+        }
+
+        // 恢复亮度
+        requireActivity().window.attributes = requireActivity().window.attributes.apply {
+            screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        }
+
+        // Switch 状态归位
+        binding.turnoffLightSwitch.isChecked = false
     }
 
     private fun showQRCodeDialog(bitmap: Bitmap?) {

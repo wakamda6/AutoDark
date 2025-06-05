@@ -199,7 +199,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_centerVertical="true"
-                android:text="调整亮度"
+                android:text="防误触黑屏"
                 android:textColor="@color/colorText"
                 android:textSize="@dimen/sp_16" />
 
