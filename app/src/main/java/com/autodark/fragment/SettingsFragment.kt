@@ -1,20 +1,14 @@
 package com.autodark.fragment
 
-import android.app.Activity
+import android.app.ActivityManager
 import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Message
-import android.provider.Settings
 import android.text.TextUtils
 import com.autodark.R
 import com.autodark.databinding.FragmentSettingsBinding
@@ -28,7 +22,6 @@ import com.pengxh.kt.lite.extensions.convertColor
 import com.pengxh.kt.lite.extensions.navigatePageTo
 import com.pengxh.kt.lite.extensions.setScreenBrightness
 import com.pengxh.kt.lite.utils.SaveKeyValues
-import com.pengxh.kt.lite.utils.WeakReferenceHandler
 import com.pengxh.kt.lite.widget.dialog.AlertInputDialog
 import com.pengxh.kt.lite.widget.dialog.BottomActionSheet
 import com.autodark.utils.LogUtils
@@ -36,9 +29,9 @@ import android.util.Log
 import android.view.*
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.activity.result.contract.ActivityResultContracts
 import com.autodark.BaseApplication
 import com.autodark.extensions.*
+import com.autodark.utils.PermissionManager
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
@@ -46,45 +39,29 @@ import com.journeyapps.barcodescanner.BarcodeEncoder
 import com.pengxh.kt.lite.extensions.show
 
 
-class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.Callback {
+class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
 
     private val kTag = "SettingsFragment"
 
     var id:String = ""
-
     private var time:String = ""
-
     private var screenCoverView: View? = null
-
-    companion object {
-        var weakReferenceHandler: WeakReferenceHandler? = null
-    }
-
     private val timeArray = arrayListOf("15s", "30s", "45s", "60s")
 
-    private val notificationPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            binding.noticeSwitch.isChecked = isNotificationListenerEnabled(requireContext())
-        }
-
-    private val requestOverlayPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == Activity.RESULT_OK) {
-                // 权限请求成功的逻辑
-                LogUtils.log(Log.DEBUG, kTag, "悬浮窗权限已授予")
-            } else {
-                // 权限请求失败的逻辑
-                LogUtils.log(Log.DEBUG, kTag, "悬浮窗权限未授予")
-            }
-        }
-
     override fun setupTopBarLayout() {
-        LogUtils.log(Log.DEBUG,kTag, "顶部栏布局设置完成")
         binding.rootView.initImmersionBar(this, true, R.color.white)
     }
 
     override fun observeRequestState() {
 
+    }
+
+    //设置证书时长
+    fun setIdText(time: String) {
+        this.time = time
+        if (isAdded) {
+            binding.tvTimeout.text = time
+        }
     }
 
     override fun initViewBinding(
@@ -94,16 +71,8 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
     }
 
     override fun initOnCreate(savedInstanceState: Bundle?) {
-        weakReferenceHandler = WeakReferenceHandler(this)
         binding.appVersion.text = com.autodark.BuildConfig.VERSION_NAME
         LogUtils.log(Log.DEBUG,kTag,"Fragment 创建，应用版本: ${com.autodark.BuildConfig.VERSION_NAME}")
-    }
-
-    fun setIdText(time: String) {
-        this.time = time
-        if (isAdded) {
-            binding.tvTimeout.text = time
-        }
     }
 
     override fun initEvent() {
@@ -156,44 +125,6 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
                 }).build().show()
         }
 
-        binding.floatSwitch.setOnClickListener {
-            LogUtils.log(Log.DEBUG, kTag, "悬浮开关被点击，当前状态: ${binding.floatSwitch.isChecked}")
-            val sdkInt = Build.VERSION.SDK_INT
-            if (sdkInt >= Build.VERSION_CODES.M) {
-                if (sdkInt >= Build.VERSION_CODES.O) {
-                    LogUtils.log(Log.DEBUG, kTag, "请求悬浮窗权限")
-                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-                    requestOverlayPermissionLauncher.launch(intent)
-                } else {
-                    LogUtils.log(Log.DEBUG, kTag, "请求悬浮窗权限（6.0以下）")
-                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-                    intent.data = Uri.parse("package:${requireContext().packageName}")
-                    requestOverlayPermissionLauncher.launch(intent)
-                }
-            } else {
-                LogUtils.log(Log.DEBUG, kTag, "手机系统版本太低，无法请求权限")
-                "手机系统版本太低".show(requireContext())
-            }
-        }
-
-        binding.noticeSwitch.setOnCheckedChangeListener { _, isChecked ->
-            LogUtils.log(Log.DEBUG, kTag, "通知监听开关被点击，当前状态: ${binding.noticeSwitch.isChecked}")
-            if (isChecked) {
-                if (!isNotificationListenerEnabled(requireContext())) {
-                    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                    notificationPermissionLauncher.launch(intent)
-                    LogUtils.log(Log.DEBUG, kTag, "授权通知监听成功")
-                }else{
-                    LogUtils.log(Log.DEBUG, kTag, "通知监听已授权")
-                }
-            } else {
-                LogUtils.log(Log.DEBUG, kTag, "关闭开关，跳转到设置取消通知监听权限")
-                val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                startActivity(intent)
-            }
-        }
-
-
         binding.openTestLayout.setOnClickListener {
             LogUtils.log(Log.DEBUG,kTag, "打开测试布局被点击")
             val packageManager = requireContext().packageManager
@@ -224,15 +155,6 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
                 // 显示黑色遮罩 + 禁用触摸
                 showScreenCover()
             }
-//            else {
-//                LogUtils.log(Log.DEBUG,kTag, "恢复默认亮度")
-//                requireActivity().window.setScreenBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE)
-//            }
-        }
-
-        binding.backToHomeSwitch.setOnCheckedChangeListener { _, isChecked ->
-            LogUtils.log(Log.DEBUG,kTag, "返回主页开关状态改变: $isChecked")
-            SaveKeyValues.putValue(Constant.BACK_TO_HOME, isChecked)
         }
 
         binding.notificationLayout.setOnClickListener {
@@ -328,7 +250,6 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
         }
     }
 
-
     private fun generateQRCode(data: String): Bitmap? {
         try {
             val multiFormatWriter = MultiFormatWriter()
@@ -341,100 +262,35 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>(), Handler.
         return null
     }
 
-    private fun isNotificationListenerEnabled(context: Context): Boolean {
-        val cn = ComponentName(context, NotificationMonitorService::class.java)
-        val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
-        return flat?.contains(cn.flattenToString()) == true
-    }
+    private fun ensureServicesAreRunning() {
+        val context = requireContext()
+        val serviceIntent = Intent(context, FloatingWindowService::class.java)
 
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        LogUtils.log(Log.DEBUG,kTag, "onActivityResult 被调用，requestCode: $requestCode, resultCode: $resultCode")
-        super.onActivityResult(requestCode, resultCode, data)
-
-        if (requestCode == 100) {
-            LogUtils.log(Log.DEBUG,kTag, "处理请求码 100")
-            if (requireContext().notificationEnable()) {
-                LogUtils.log(Log.DEBUG,kTag, "通知已启用，禁用通知监听服务")
-                requireContext().packageManager.setComponentEnabledSetting(
-                    ComponentName(requireContext(), NotificationMonitorService::class.java),
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                    PackageManager.DONT_KILL_APP
-                )
-
-                Thread.sleep(1000)
-
-                LogUtils.log(Log.DEBUG,kTag, "重新启用通知监听服务")
-                requireContext().packageManager.setComponentEnabledSetting(
-                    ComponentName(requireContext(), NotificationMonitorService::class.java),
-                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                    PackageManager.DONT_KILL_APP
-                )
-            } else {
-                LogUtils.log(Log.DEBUG,kTag, "通知未启用，跳过处理")
-            }
-        } else if (requestCode == 101) {
-            LogUtils.log(Log.DEBUG,kTag, "处理请求码 101")
-            binding.floatSwitch.isChecked = Settings.canDrawOverlays(requireContext())
-            LogUtils.log(Log.DEBUG,kTag, "悬浮窗权限状态: ${binding.floatSwitch.isChecked}")
+        //悬浮框
+        if (!requireContext().isServiceRunning(FloatingWindowService::class.java)) {
+            context.startService(serviceIntent)
+            LogUtils.log(Log.DEBUG, kTag, "启动悬浮窗服务")
         }
     }
 
-
-    override fun handleMessage(msg: Message): Boolean {
-        when (msg.what) {
-            2024090801 -> {
-                "通知监听服务运行中".show(requireContext())
-                binding.noticeSwitch.isChecked = true
-                binding.tipsView.visibility = View.GONE
-            }
-            2024090802 -> {
-                "通知监听服务已关闭".show(requireContext())
-                binding.noticeSwitch.isChecked = false
-                binding.tipsView.visibility = View.VISIBLE
-            }
-            else -> {
-                LogUtils.log(Log.DEBUG,kTag, "未知消息类型: ${msg.what}")
-            }
-        }
-        return true
+    private fun Context.isServiceRunning(serviceClass: Class<*>): Boolean {
+        val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        return manager.getRunningServices(Int.MAX_VALUE)
+            .any { it.service.className == serviceClass.name }
     }
+
 
     override fun onResume() {
         super.onResume()
-        LogUtils.log(Log.DEBUG,kTag,"onResume 被调用")
-
-        val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
-        binding.emailTextView.text = emailAddress
-        LogUtils.log(Log.DEBUG,kTag,"邮箱地址更新为: $emailAddress")
-
-        val timeout = SaveKeyValues.getValue(Constant.TIMEOUT, "15s") as String
-        binding.timeoutTextView.text = timeout
-        LogUtils.log(Log.DEBUG,kTag,"超时设置更新为: $timeout")
-
-        binding.floatSwitch.isChecked = Settings.canDrawOverlays(requireContext())
-        LogUtils.log(Log.DEBUG,kTag,"悬浮开关状态: ${binding.floatSwitch.isChecked}")
-
-        val serviceIntent = Intent(requireContext(), FloatingWindowService::class.java)
-        if (binding.floatSwitch.isChecked) {
-            requireContext().startService(serviceIntent)
-            LogUtils.log(Log.DEBUG,kTag,"启动悬浮窗服务")
-        } else {
-            requireContext().stopService(serviceIntent)
-            LogUtils.log(Log.DEBUG,kTag,"停止悬浮窗服务")
-        }
-
-        val backToHome = SaveKeyValues.getValue(Constant.BACK_TO_HOME, false) as Boolean
-        binding.backToHomeSwitch.isChecked = backToHome
-        LogUtils.log(Log.DEBUG,kTag,"返回主界面开关状态: $backToHome")
-
-        binding.noticeSwitch.isChecked = isNotificationListenerEnabled(requireContext())
-        if (binding.noticeSwitch.isChecked) {
-            binding.tipsView.visibility = View.GONE
-        } else {
-            binding.tipsView.text = "通知监听服务未开启，无法监听打卡通知"
-            binding.tipsView.setTextColor(R.color.red.convertColor(requireContext()))
-            LogUtils.log(Log.DEBUG,kTag,"通知监听服务未开启")
+        //权限检查
+        if (PermissionManager.allPermissionsGranted(requireActivity())) {
+            ensureServicesAreRunning()
+        }else {
+            // 3. 触发弹窗申请权限
+            PermissionManager.checkAllPermissions(requireActivity()) {
+                // 授权后再次检查服务
+                ensureServicesAreRunning()
+            }
         }
     }
 

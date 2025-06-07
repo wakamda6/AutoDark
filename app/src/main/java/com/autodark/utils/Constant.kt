@@ -17,7 +17,6 @@ object Constant {
     const val EMAIL_ADDRESS = "emailAddress"
     const val EMAIL_TITLE = "打卡结果通知"
     const val TIMEOUT = "timeout"
-    const val BACK_TO_HOME = "backToHome"
     const val DING_DING_KEY = "打卡"
 
     const val DING_DING = "com.alibaba.android.rimet"

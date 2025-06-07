@@ -16,7 +16,6 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.autodark.extensions.createTextMail
 import com.autodark.extensions.openApplication
 import com.autodark.extensions.sendTextMail
-import com.autodark.fragment.SettingsFragment
 import com.autodark.ui.MainActivity
 import com.autodark.utils.Constant
 import com.autodark.utils.Constant.FOREGROUND_RUNNING_SERVICE_TITLE
@@ -71,7 +70,6 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
         try {
             if (!isServiceInitialized()) {
                 LogUtils.log(Log.DEBUG, kTag, "通知监听服务初始化")
-                SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090801)
                 markServiceInitialized()
             } else {
                 LogUtils.log(Log.DEBUG, kTag, "通知监听服务已经初始化,不再初始化...")
@@ -84,7 +82,6 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
     }
 
     override fun onListenerDisconnected() {
-        SettingsFragment.weakReferenceHandler?.sendEmptyMessage(2024090802)
         clearServiceInitialized()
     }
 
@@ -93,6 +90,8 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
      */
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         LogUtils.log(Log.DEBUG,kTag, "收到新通知")
+
+        val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
 
         val extras = sbn.notification.extras
         // 获取接收消息APP的包名
@@ -122,56 +121,42 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
 
         notificationBeanDao.save(notificationBean)
 
-        val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
-        if (emailAddress.isEmpty()) {
-            LogUtils.log(Log.DEBUG,kTag, "邮箱地址为空")
-            "邮箱地址为空".show(this)
-            return
-        }
-
         if (packageName == Constant.DING_DING) {
             if (notice.contains("成功")) {
                 lifecycleScope.launch(Dispatchers.Main) {
                     delay(1000)
                     backToMainActivity()
                 }
-                // 发送打卡成功的邮件
-                // 在 SharedPreferences 中保存是否已经发送
-                val hasSentKey = "has_sent_email"
-                val isSentRecently = SaveKeyValues.getValue(hasSentKey, false) as Boolean
-
-                if (!isSentRecently) {
-                    lifecycleScope.launch(Dispatchers.Main) {
-                        "即将发送通知邮件，请注意查收".show(this@NotificationMonitorService)
-                        withContext(Dispatchers.IO) {
-                            val subject = SaveKeyValues.getValue(
-                                Constant.EMAIL_TITLE, "打卡结果通知"
-                            ) as String
-                            notice.createTextMail(subject, emailAddress).sendTextMail()
-                            LogUtils.log(Log.DEBUG, kTag, "邮件发送成功")
-
-                            // 更新标志位，表示已经发送邮件
-                            SaveKeyValues.putValue(hasSentKey, true)
-
-                            // 设置冷却时间，例如 1 秒后可以再次发送
-                            lifecycleScope.launch(Dispatchers.IO) {
-                                delay(1000L)  // 延迟 1 秒
-                                SaveKeyValues.putValue(hasSentKey, false)
-                            }
-                        }
-                    }
-                } else {
-                    LogUtils.log(Log.DEBUG, kTag, "邮件发送冷却中，跳过发送")
-                }
-
 
                 //通过mqtt发送通知内容
                 val notification = "dark_success:$title: $notice"
                 sendBroadcast(notification)
 
+                // 发送打卡成功的邮件
+                if (emailAddress.isEmpty()) {
+                    LogUtils.log(Log.DEBUG,kTag, "邮箱地址为空")
+                    "邮箱地址为空".show(this)
+                    return
+                }
+
+                lifecycleScope.launch(Dispatchers.Main) {
+                    "即将发送通知邮件，请注意查收".show(this@NotificationMonitorService)
+                    withContext(Dispatchers.IO) {
+                        val subject = SaveKeyValues.getValue(
+                            Constant.EMAIL_TITLE, "打卡结果通知"
+                        ) as String
+                        notice.createTextMail(subject, emailAddress).sendTextMail()
+                        LogUtils.log(Log.DEBUG, kTag, "邮件发送成功")
+                    }
+                }
             }
         } else if (packageName in listOf(Constant.WECHAT, Constant.QQ, Constant.TIM, Constant.ZFB)) {
             if (notice.contains("电量")) {
+                if (emailAddress.isEmpty()) {
+                    LogUtils.log(Log.DEBUG,kTag, "邮箱地址为空")
+                    "邮箱地址为空".show(this)
+                    return
+                }
                 val capacity = batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
                 // 发送剩余电量的邮件
                 lifecycleScope.launch(Dispatchers.IO) {
@@ -193,16 +178,14 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
     private suspend fun backToMainActivity() {
         CountDownTimerManager.get.cancelTimer()
 
-        if (SaveKeyValues.getValue(Constant.BACK_TO_HOME, false) as Boolean) {
-            // 模拟点击Home键
-            val home = Intent(Intent.ACTION_MAIN).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                addCategory(Intent.CATEGORY_HOME)
-            }
-            startActivity(home)
-            LogUtils.log(Log.DEBUG,kTag, "模拟点击Home键")
-            delay(1000)
+        // 模拟点击Home键
+        val home = Intent(Intent.ACTION_MAIN).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            addCategory(Intent.CATEGORY_HOME)
         }
+        startActivity(home)
+        LogUtils.log(Log.DEBUG,kTag, "模拟点击Home键")
+        delay(1000)
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -216,10 +199,5 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
      */
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         LogUtils.log(Log.DEBUG,kTag, "通知已移除")
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        registry.currentState = Lifecycle.State.DESTROYED
     }
 }

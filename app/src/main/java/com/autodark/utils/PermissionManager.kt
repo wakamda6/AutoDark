@@ -19,7 +19,14 @@ object PermissionManager {
     private const val PREFS_NAME = "permission_prefs"
     private const val KEY_AUTO_START_REMINDER = "auto_start_reminder_shown"
 
-    fun checkAllPermissions(activity: Activity) {
+    //检查
+    fun allPermissionsGranted(context: Context): Boolean {
+        return Settings.canDrawOverlays(context) &&
+                isNotificationListenerEnabled(context) &&
+                isIgnoringBatteryOptimizations(context)
+    }
+
+    fun checkAllPermissions(activity: Activity, onGranted: (() -> Unit)? = null) {
         when {
             !Settings.canDrawOverlays(activity) -> {
                 showDialog(
@@ -46,19 +53,23 @@ object PermissionManager {
             }
 
             else -> {
-                // 判断是否已提醒过自启动权限
-                val prefs = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                val alreadyReminded = prefs.getBoolean(KEY_AUTO_START_REMINDER, false)
-                if (!alreadyReminded) {
-                    showDialog(activity, "自启动权限", "为确保功能正常，请设置应用允许自启动") {
-                        requestAutoStartPermission(activity)
-                        // 记录已提醒，避免重复弹窗
-                        prefs.edit().putBoolean(KEY_AUTO_START_REMINDER, true).apply()
-                    }
-                }
-                // 如果已提醒过，就不再弹窗，避免循环
-                Toast.makeText(activity, "所有权限已授予，请自行确认自启动权限是否打开", Toast.LENGTH_SHORT).show()
+                onGranted?.invoke()
             }
+
+//            else -> {
+//                // 判断是否已提醒过自启动权限
+//                val prefs = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+//                val alreadyReminded = prefs.getBoolean(KEY_AUTO_START_REMINDER, false)
+//                if (!alreadyReminded) {
+//                    showDialog(activity, "自启动权限", "为确保功能正常，请设置应用允许自启动") {
+//                        requestAutoStartPermission(activity)
+//                        // 记录已提醒，避免重复弹窗
+//                        prefs.edit().putBoolean(KEY_AUTO_START_REMINDER, true).apply()
+//                    }
+//                }
+//                // 如果已提醒过，就不再弹窗，避免循环
+//                Toast.makeText(activity, "所有权限已授予，请自行确认自启动权限是否打开", Toast.LENGTH_SHORT).show()
+//            }
         }
     }
 
@@ -74,7 +85,6 @@ object PermissionManager {
 
     // 通知监听
     private fun isNotificationListenerEnabled(context: Context): Boolean {
-        LogUtils.log(Log.DEBUG, kTag, "检查通知监听权限")
         val enabledListeners = Settings.Secure.getString(
             context.contentResolver,
             "enabled_notification_listeners"
@@ -109,7 +119,6 @@ object PermissionManager {
 
     // 电池优化白名单
     private fun isIgnoringBatteryOptimizations(context: Context): Boolean {
-        LogUtils.log(Log.DEBUG, kTag, "检查电池优化白名单权限")
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         return pm.isIgnoringBatteryOptimizations(context.packageName)
     }
