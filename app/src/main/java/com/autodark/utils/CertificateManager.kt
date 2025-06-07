@@ -37,7 +37,7 @@ object CertificateManager  {
     private const val kTag = "CertificateManager"
 
     //证书验证的主函数：
-    suspend fun getAndCheckCA(context: Context, ID: String): CertCheckResult {
+    suspend fun getAndCheckCA(context: Context, ID: String, retryIfRevoked: Boolean = true): CertCheckResult {
         val clientEnPath = File(context.filesDir, "$ID.en")
         val caEnPath = File(context.filesDir, "ca.en")
         val baseUrl = "https://***REMOVED***/certs/${ID}/en_${ID}"
@@ -56,11 +56,26 @@ object CertificateManager  {
         if (p12Bytes == null || caBytes == null) {
             LogUtils.log(Log.ERROR, kTag, "证书解密失败，删除本地缓存")
             deleteCertFiles(clientEnPath, caEnPath)
-            return CertCheckResult(CertCheckResult.Status.CADecodeFailed)
+            return CertCheckResult(CertCheckResult.Status.CADecodeFailed, "证书解密失败")
         }
 
         //3加载并验证证书
         val checkCertResult = checkCertRevoked(p12Bytes, ID)
+
+        //如果是证书被吊销，自动重试一次
+        if (checkCertResult.status == CertCheckResult.Status.CAisRevoked) {
+            LogUtils.log(Log.ERROR, kTag, "证书被吊销")
+            deleteCertFiles(clientEnPath, caEnPath)
+
+            // 自动重试一次
+            return if (retryIfRevoked) {
+                LogUtils.log(Log.DEBUG, kTag, "检测到吊销后尝试重新获取证书")
+                getAndCheckCA(context, ID, retryIfRevoked = false)
+            } else {
+                CertCheckResult(CertCheckResult.Status.CAisRevoked, "证书已被吊销")
+            }
+        }
+
         if (checkCertResult.status != CertCheckResult.Status.CASuccess) {
             LogUtils.log(Log.ERROR, kTag, "证书验证失败，删除本地缓存")
             deleteCertFiles(clientEnPath, caEnPath)
@@ -70,7 +85,7 @@ object CertificateManager  {
         // 初始化 SSL
         if(!MqttConfigHolder.initSslContextIfNeeded(p12Bytes, ID.toCharArray(), caBytes)){
             deleteCertFiles(clientEnPath, caEnPath)
-            return CertCheckResult(CertCheckResult.Status.SSLError)
+            return CertCheckResult(CertCheckResult.Status.SSLError, "SSL 初始化失败")
         }
 
         return CertCheckResult(CertCheckResult.Status.CASuccess, checkCertResult.message)
@@ -157,11 +172,11 @@ object CertificateManager  {
 
             if (crl.isRevoked(clientCert)) {
                 LogUtils.log(Log.WARN, kTag, "客户端证书已被吊销")
-                return CertCheckResult(CertCheckResult.Status.CAisRevoked, "证书已吊销")
+                return CertCheckResult(CertCheckResult.Status.CAisRevoked, "证书已被吊销")
             }
 
             val remaining = formatRemainingTime(clientCert.notAfter)
-            CertCheckResult(CertCheckResult.Status.CASuccess, remaining)
+            return CertCheckResult(CertCheckResult.Status.CASuccess, remaining)
 
         } catch (e: Exception) {
             LogUtils.log(Log.WARN,kTag, "P12 证书加载失败: ${e.message}")
