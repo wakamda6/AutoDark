@@ -35,6 +35,11 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
     private val kTag = "NotificationMonitorService"
     private val registry = LifecycleRegistry(this)
 
+    companion object {
+        var isConnected = false
+    }
+
+
     private fun sendBroadcast(message: String) {
         LogUtils.log(Log.DEBUG,kTag, "发送打卡结果到mqtt:$message")
         val intent = Intent("com.example.MQTT_PUBLISH_DARK_RESULT")
@@ -51,38 +56,14 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
     /**
      * 有可用的并且和通知管理器连接成功时回调
      */
-    private fun isServiceInitialized(): Boolean {
-        return getSharedPreferences("service_prefs", Context.MODE_PRIVATE)
-            .getBoolean("is_initialized", false)
-    }
-
-    private fun markServiceInitialized() {
-        getSharedPreferences("service_prefs", Context.MODE_PRIVATE)
-            .edit().putBoolean("is_initialized", true).apply()
-    }
-
-    private fun clearServiceInitialized() {
-        getSharedPreferences("service_prefs", Context.MODE_PRIVATE)
-            .edit().remove("is_initialized").apply()
-    }
-
     override fun onListenerConnected() {
-        try {
-            if (!isServiceInitialized()) {
-                LogUtils.log(Log.DEBUG, kTag, "通知监听服务初始化")
-                markServiceInitialized()
-            } else {
-                LogUtils.log(Log.DEBUG, kTag, "通知监听服务已经初始化,不再初始化...")
-            }
-        } catch (e: Exception) {
-            // 可清除标记以允许下次初始化
-            getSharedPreferences("service_prefs", Context.MODE_PRIVATE)
-                .edit().remove("is_initialized").apply()
-        }
+        super.onListenerConnected()
+        isConnected = true
     }
 
     override fun onListenerDisconnected() {
-        clearServiceInitialized()
+        super.onListenerDisconnected()
+        isConnected = false
     }
 
     /**

@@ -37,7 +37,7 @@ import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import com.pengxh.kt.lite.extensions.show
-
+import android.provider.Settings
 
 class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
 
@@ -271,6 +271,14 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
             context.startService(serviceIntent)
             LogUtils.log(Log.DEBUG, kTag, "启动悬浮窗服务")
         }
+
+        if (!NotificationMonitorService.isConnected || !isNotificationServiceReallyEnabled(requireContext())) {
+            LogUtils.log(Log.WARN, kTag, "通知监听服务尚未连接，尝试重启")
+            val intent = Intent(requireContext(), NotificationMonitorService::class.java)
+            requireContext().startService(intent)
+        }else {
+            LogUtils.log(Log.DEBUG, kTag, "通知监听服务正常")
+        }
     }
 
     private fun Context.isServiceRunning(serviceClass: Class<*>): Boolean {
@@ -279,6 +287,15 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
             .any { it.service.className == serviceClass.name }
     }
 
+    //通知监听服务判断
+    private fun isNotificationServiceReallyEnabled(context: Context): Boolean {
+        val cn = ComponentName(context, NotificationMonitorService::class.java)
+        val enabledListeners = Settings.Secure.getString(
+            context.contentResolver,
+            "enabled_notification_listeners"
+        )
+        return enabledListeners?.contains(cn.flattenToString()) == true
+    }
 
     override fun onResume() {
         super.onResume()
@@ -292,6 +309,14 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
                 ensureServicesAreRunning()
             }
         }
+
+        val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
+        binding.emailTextView.text = emailAddress
+        LogUtils.log(Log.DEBUG,kTag,"邮箱地址更新为: $emailAddress")
+
+        val timeout = SaveKeyValues.getValue(Constant.TIMEOUT, "15s") as String
+        binding.timeoutTextView.text = timeout
+        LogUtils.log(Log.DEBUG,kTag,"超时设置更新为: $timeout")
     }
 
 }
