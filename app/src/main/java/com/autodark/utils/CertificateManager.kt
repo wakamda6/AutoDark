@@ -51,18 +51,25 @@ object CertificateManager  {
         }
 
         //2解密证书
-        val p12Bytes = decryptCertFile(clientEnPath, ID) ?: return CertCheckResult(CertCheckResult.Status.CADecodeFailed)
-        val caBytes = decryptCertFile(caEnPath, ID) ?: return CertCheckResult(CertCheckResult.Status.CADecodeFailed)
+        val p12Bytes = decryptCertFile(clientEnPath, ID)
+        val caBytes = decryptCertFile(caEnPath, ID)
+        if (p12Bytes == null || caBytes == null) {
+            LogUtils.log(Log.ERROR, kTag, "证书解密失败，删除本地缓存")
+            deleteCertFiles(clientEnPath, caEnPath)
+            return CertCheckResult(CertCheckResult.Status.CADecodeFailed)
+        }
 
         //3加载并验证证书
         val checkCertResult = checkCertRevoked(p12Bytes, ID)
         if (checkCertResult.status != CertCheckResult.Status.CASuccess) {
-            LogUtils.log(Log.WARN, kTag, "证书验证失败: ${checkCertResult.status}")
+            LogUtils.log(Log.ERROR, kTag, "证书验证失败，删除本地缓存")
+            deleteCertFiles(clientEnPath, caEnPath)
             return checkCertResult
         }
 
         // 初始化 SSL
         if(!MqttConfigHolder.initSslContextIfNeeded(p12Bytes, ID.toCharArray(), caBytes)){
+            deleteCertFiles(clientEnPath, caEnPath)
             return CertCheckResult(CertCheckResult.Status.SSLError)
         }
 
@@ -70,28 +77,25 @@ object CertificateManager  {
     }
 
     //删除ca文件
-//    private fun deleteCA(context: Context, ID: String) {
-//        val clientEnPath = File(context.filesDir, "$ID.en")
-//        val caEnPath = File(context.filesDir, "ca.en")
-//
-//        if (clientEnPath.exists()) {
-//            val deleted = clientEnPath.delete()
-//            if (deleted) {
-//                LogUtils.log(Log.DEBUG, kTag, "客户端证书删除成功")
-//            } else {
-//                LogUtils.log(Log.WARN, kTag, "客户端证书删除失败")
-//            }
-//        }
-//
-//        if (caEnPath.exists()) {
-//            val deleted = caEnPath.delete()
-//            if (deleted) {
-//                LogUtils.log(Log.DEBUG, kTag, "CA证书删除成功")
-//            } else {
-//                LogUtils.log(Log.WARN, kTag, "CA证书删除失败")
-//            }
-//        }
-//    }
+    private fun deleteCertFiles(clientEnPath: File, caEnPath: File) {
+        if (clientEnPath.exists()) {
+            val deleted = clientEnPath.delete()
+            if (deleted) {
+                LogUtils.log(Log.DEBUG, kTag, "客户端证书删除成功")
+            } else {
+                LogUtils.log(Log.WARN, kTag, "客户端证书删除失败")
+            }
+        }
+
+        if (caEnPath.exists()) {
+            val deleted = caEnPath.delete()
+            if (deleted) {
+                LogUtils.log(Log.DEBUG, kTag, "CA证书删除成功")
+            } else {
+                LogUtils.log(Log.WARN, kTag, "CA证书删除失败")
+            }
+        }
+    }
 
     //1. 获取证书：如果存在则直接校验，如果不存在则需要下载，下载三次，如果还不成功则返回下载失败
     private suspend fun checkAndDownloadCerts(clientEnPath:File, caEnPath:File, clientEnUrl:String, caEnUrl:String):CertCheckResult {
@@ -152,7 +156,7 @@ object CertificateManager  {
             }
 
             if (crl.isRevoked(clientCert)) {
-                LogUtils.log(Log.WARN, kTag, "客户端证书已被吊销,重新下载证书验证")
+                LogUtils.log(Log.WARN, kTag, "客户端证书已被吊销")
                 return CertCheckResult(CertCheckResult.Status.CAisRevoked, "证书已吊销")
             }
 
