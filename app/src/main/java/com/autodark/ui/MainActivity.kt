@@ -75,13 +75,11 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         binding.viewPager.adapter = fragmentAdapter
         binding.viewPager.offscreenPageLimit = fragmentPages.size  // 强制加载所有 Fragment
 
+        //证书验证
         viewModel.initState.observe(this) { state ->
             when (state) {
-                is InitState.Loading -> {
-                    // show loading UI
-                }
                 is InitState.Success -> {
-                    // continue app flow
+                    settingsFragment.setIdText(state.remaining)
                 }
                 is InitState.Failed -> {
                     showErrorDialog(state.reason)

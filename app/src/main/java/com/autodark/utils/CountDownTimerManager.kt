@@ -29,9 +29,8 @@ class CountDownTimerManager private constructor() : LifecycleOwner {
     private val kTag = "AuToDark.CountDownTimerManager"
     private val registry = LifecycleRegistry(this)
 
-    override fun getLifecycle(): Lifecycle {
-        return registry
-    }
+    override val lifecycle: Lifecycle
+        get() = registry
 
     companion object {
         val get by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {

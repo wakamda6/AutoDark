@@ -43,9 +43,8 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent) // 发送广播
     }
 
-    override fun getLifecycle(): Lifecycle {
-        return registry
-    }
+    override val lifecycle: Lifecycle
+        get() = registry
 
     private val notificationBeanDao by lazy { com.autodark.BaseApplication.get().daoSession.notificationBeanDao }
     private val batteryManager by lazy { getSystemService<BatteryManager>() }
@@ -217,5 +216,10 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
      */
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         LogUtils.log(Log.DEBUG,kTag, "通知已移除")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        registry.currentState = Lifecycle.State.DESTROYED
     }
 }

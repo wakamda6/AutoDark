@@ -19,64 +19,25 @@ import javax.crypto.CipherInputStream
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
+data class CertCheckResult(
+    val status: Status,
+    val message: String = ""
+) {
+    enum class Status {
+        CASuccess,
+        CAGetFailed,
+        CADecodeFailed,
+        CAisRevoked,
+        CheckCertRevokedError,
+        SSLError
+    }
+}
+
 object CertificateManager  {
     private const val kTag = "CertificateManager"
 
-//    private fun showRetryDialog(result:String,context: Context, ID: String) {
-//        var title = ""
-//        var message = ""
-//        when (result) {
-//            "CAisRevoked" -> {
-//                title = "证书已被吊销"
-//                message = "验证失败，请将页面截图发送给开发者后重试\n"
-//            }
-//            "CAGetFailed" -> {
-//                title = "证书文件下载失败"
-//                message = "请将页面截图发送给开发者后重试\n"
-//            }
-//            "CAisTimeout" -> {
-//                title = "证书已过期"
-//                message = "请联系开发者购买时长\n"
-//            }
-//            "SSLError" -> {
-//                title = "连接失败"
-//                message = "请联系开发者\n"
-//            }
-//            "PermissionFailed" -> {
-//                title = "权限不满足"
-//                message = "请给与权限\n"
-//            }
-//        }
-//        AlertMessageDialog.Builder()
-//            .setContext(this)
-//            .setTitle(title)
-//            .setMessage(message + "ID：$ID")
-//            .setPositiveButton("重试")
-//            .setOnDialogButtonClickListener(object :
-//                AlertMessageDialog.OnDialogButtonClickListener {
-//                override fun onConfirmClick() {
-//                    lifecycleScope.launch(Dispatchers.IO) {
-//                        //点击后重新下载并检查
-//                        val result2 = getAndCheckCA(context, ID)
-//                        if (result2 != "CASuccess") {
-//                            // 回到主线程再弹窗
-//                            launch(Dispatchers.Main) {
-//                                deleteCA(context, ID)
-//                                showRetryDialog(result2,context, ID)
-//                            }
-//                        }else {
-//                            if(caTimes.isNotEmpty()){
-//                                settingsFragment.setIdText(caTimes)
-//                            }
-//                            startService(Intent(this@MainActivity, MqttService::class.java))
-//                        }
-//                    }
-//                }
-//            }).build().show()
-//    }
-
     //证书验证的主函数：
-    suspend fun getAndCheckCA(context: Context, ID: String): String {
+    suspend fun getAndCheckCA(context: Context, ID: String): CertCheckResult {
         val clientEnPath = File(context.filesDir, "$ID.en")
         val caEnPath = File(context.filesDir, "ca.en")
         val baseUrl = "https://***REMOVED***/certs/${ID}/en_${ID}"
@@ -85,50 +46,55 @@ object CertificateManager  {
 
         //1获取证书
         val result = checkAndDownloadCerts(clientEnPath,caEnPath,clientEnUrl,caEnUrl)
-        if (result != "CASuccess") return result
+        if (result.status != CertCheckResult.Status.CASuccess) {
+            return result
+        }
 
         //2解密证书
-        val p12Bytes = decryptCertFile(clientEnPath, ID) ?: return "CAGetFailed"
-        val caBytes = decryptCertFile(caEnPath, ID) ?: return "CAGetFailed"
+        val p12Bytes = decryptCertFile(clientEnPath, ID) ?: return CertCheckResult(CertCheckResult.Status.CADecodeFailed)
+        val caBytes = decryptCertFile(caEnPath, ID) ?: return CertCheckResult(CertCheckResult.Status.CADecodeFailed)
 
         //3加载并验证证书
         val checkCertResult = checkCertRevoked(p12Bytes, ID)
-        if (!checkCertResult.contains("CASuccess")) return result
+        if (checkCertResult.status != CertCheckResult.Status.CASuccess) {
+            LogUtils.log(Log.WARN, kTag, "证书验证失败: ${checkCertResult.status}")
+            return checkCertResult
+        }
 
         // 初始化 SSL
         if(!MqttConfigHolder.initSslContextIfNeeded(p12Bytes, ID.toCharArray(), caBytes)){
-            return "SSLError"
+            return CertCheckResult(CertCheckResult.Status.SSLError)
         }
 
-        return "CASuccess"
+        return CertCheckResult(CertCheckResult.Status.CASuccess, checkCertResult.message)
     }
 
     //删除ca文件
-    private fun deleteCA(context: Context, ID: String) {
-        val clientEnPath = File(context.filesDir, "$ID.en")
-        val caEnPath = File(context.filesDir, "ca.en")
-
-        if (clientEnPath.exists()) {
-            val deleted = clientEnPath.delete()
-            if (deleted) {
-                LogUtils.log(Log.DEBUG, kTag, "客户端证书删除成功")
-            } else {
-                LogUtils.log(Log.WARN, kTag, "客户端证书删除失败")
-            }
-        }
-
-        if (caEnPath.exists()) {
-            val deleted = caEnPath.delete()
-            if (deleted) {
-                LogUtils.log(Log.DEBUG, kTag, "CA证书删除成功")
-            } else {
-                LogUtils.log(Log.WARN, kTag, "CA证书删除失败")
-            }
-        }
-    }
+//    private fun deleteCA(context: Context, ID: String) {
+//        val clientEnPath = File(context.filesDir, "$ID.en")
+//        val caEnPath = File(context.filesDir, "ca.en")
+//
+//        if (clientEnPath.exists()) {
+//            val deleted = clientEnPath.delete()
+//            if (deleted) {
+//                LogUtils.log(Log.DEBUG, kTag, "客户端证书删除成功")
+//            } else {
+//                LogUtils.log(Log.WARN, kTag, "客户端证书删除失败")
+//            }
+//        }
+//
+//        if (caEnPath.exists()) {
+//            val deleted = caEnPath.delete()
+//            if (deleted) {
+//                LogUtils.log(Log.DEBUG, kTag, "CA证书删除成功")
+//            } else {
+//                LogUtils.log(Log.WARN, kTag, "CA证书删除失败")
+//            }
+//        }
+//    }
 
     //1. 获取证书：如果存在则直接校验，如果不存在则需要下载，下载三次，如果还不成功则返回下载失败
-    private suspend fun checkAndDownloadCerts(clientEnPath:File, caEnPath:File, clientEnUrl:String, caEnUrl:String):String {
+    private suspend fun checkAndDownloadCerts(clientEnPath:File, caEnPath:File, clientEnUrl:String, caEnUrl:String):CertCheckResult {
         val clientDownloaded = if (!clientEnPath.exists()) {
             downloadFile(clientEnUrl, clientEnPath)
         } else {
@@ -145,10 +111,10 @@ object CertificateManager  {
 
         if (!clientDownloaded || !caDownloaded) {
             LogUtils.log(Log.ERROR, kTag, "证书文件下载失败")
-            return "CAGetFailed"
+            return CertCheckResult(CertCheckResult.Status.CAGetFailed, "证书文件下载失败")
         }
 
-        return "CASuccess"
+        return CertCheckResult(CertCheckResult.Status.CASuccess)
     }
 
     //2. 解密证书，失败则返回空
@@ -166,33 +132,37 @@ object CertificateManager  {
         return decodeBytes
     }
 
-    //3. 加载并验证证书：获取剩余时长并返回，失败则返回验证失败
-    private fun checkCertRevoked(bytes:ByteArray, ID: String): String{
-        //剩余天数
-        val caTimes: String
+    //3. 加载并验证证书：获取剩余时长并返回，失败则返回验证失败，等待后续添加吊销后重新下载一次的逻辑
+    private suspend fun checkCertRevoked(bytes: ByteArray, ID: String): CertCheckResult  {
 
         val p12P = ID.toCharArray()
         val keyStore = KeyStore.getInstance("PKCS12")
-        try {
-            keyStore.load(bytes.inputStream(), p12P)
+        return try {
+            withContext(Dispatchers.IO) {
+                keyStore.load(bytes.inputStream(), p12P)
+            }
+
             val alias = keyStore.aliases().nextElement()
             val clientCert = keyStore.getCertificate(alias) as X509Certificate
 
-            val crl = CertificateFactory.getInstance("X.509")
-                .generateCRL(URL("https://***REMOVED***/crl/crl.pem").openStream()) as X509CRL
+            val crl = withContext(Dispatchers.IO) {
+                val url = URL("https://***REMOVED***/crl/crl.pem")
+                val inputStream = url.openStream()
+                CertificateFactory.getInstance("X.509").generateCRL(inputStream) as X509CRL
+            }
 
             if (crl.isRevoked(clientCert)) {
                 LogUtils.log(Log.WARN, kTag, "客户端证书已被吊销,重新下载证书验证")
-                return "CAisRevoked"
+                return CertCheckResult(CertCheckResult.Status.CAisRevoked, "证书已吊销")
             }
 
-            caTimes = formatRemainingTime(clientCert.notAfter)
-
-            return caTimes
+            val remaining = formatRemainingTime(clientCert.notAfter)
+            CertCheckResult(CertCheckResult.Status.CASuccess, remaining)
 
         } catch (e: Exception) {
-            LogUtils.log(Log.WARN, kTag, "P12 证书加载失败: ${e.message}")
-            return "checkCertError"
+            LogUtils.log(Log.WARN,kTag, "P12 证书加载失败: ${e.message}")
+            e.printStackTrace()
+            CertCheckResult(CertCheckResult.Status.CheckCertRevokedError)
         }
     }
 
