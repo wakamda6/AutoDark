@@ -9,6 +9,8 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 
 object MqttConfigHolder {
+    private const val kTag = "mqttSslContext"
+
     private var lastSslHash: String? = null
     var mqttSslContext: SSLContext? = null
         private set
@@ -17,8 +19,8 @@ object MqttConfigHolder {
         val newHash = (p12Bytes.contentHashCode().toString() + caBytes.contentHashCode().toString())
 
         if (newHash == lastSslHash && mqttSslContext != null) {
-            LogUtils.log(Log.DEBUG, "SslInitializer", "SSLContext 无需重新初始化")
-            return false
+            LogUtils.log(Log.DEBUG, kTag, "SSLContext 无需重新初始化")
+            return true
         }
 
         return try {
@@ -29,6 +31,7 @@ object MqttConfigHolder {
             val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm()).apply {
                 init(keyStore, p12Password)
             }
+            LogUtils.log(Log.DEBUG, kTag, "客户端证书导入成功")
 
             // CA证书
             val caCertificate = CertificateFactory.getInstance("X.509").generateCertificate(caBytes.inputStream())
@@ -39,8 +42,9 @@ object MqttConfigHolder {
             val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply {
                 init(caKeyStore)
             }
+            LogUtils.log(Log.DEBUG, kTag, "CA证书导入成功")
 
-            mqttSslContext = SSLContext.getInstance("TLSv1.3").apply {
+            mqttSslContext = SSLContext.getInstance("TLSv1.2").apply {
                 init(keyManagerFactory.keyManagers, trustManagerFactory.trustManagers, null)
             }
             lastSslHash = newHash

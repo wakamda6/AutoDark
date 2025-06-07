@@ -11,8 +11,8 @@ android {
         applicationId "com.autodark"
         minSdkVersion 24
         targetSdkVersion 33
-        versionCode 2101
-        versionName "2.1.0.1"
+        versionCode 220
+        versionName "2.2.0"
         flavorDimensions "versionCode"
     }
 
@@ -37,8 +37,8 @@ android {
     productFlavors {
         auto {
 //            debug
-//            applicationId "com.autodark"
-            applicationId = id
+            applicationId "com.autodark"
+//            applicationId = id
         }
     }
     packagingOptions {
@@ -142,6 +142,11 @@ dependencies {
     //二维码
     implementation 'com.google.zxing:core:3.5.2'
     implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+    //viewmodel
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2"
+    implementation "androidx.activity:activity-ktx:1.7.2"
+    implementation "androidx.fragment:fragment-ktx:1.5.7"
+
 
 }
 
