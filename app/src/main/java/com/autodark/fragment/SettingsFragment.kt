@@ -43,7 +43,7 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
 
     private val kTag = "SettingsFragment"
 
-    var id:String = ""
+    private var id:String = ""
     private var time:String = ""
     private var screenCoverView: View? = null
     private val timeArray = arrayListOf("15s", "30s", "45s", "60s")
@@ -57,9 +57,11 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
     }
 
     //设置证书时长
-    fun setIdText(time: String) {
+    fun setIdText(id: String,time: String) {
+        this.id = id
         this.time = time
         if (isAdded) {
+            binding.tvId.text = "本机ID：$id"
             binding.tvTimeout.text = time
         }
     }

@@ -79,7 +79,8 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         viewModel.initState.observe(this) { state ->
             when (state) {
                 is InitState.Success -> {
-                    settingsFragment.setIdText(state.remaining)
+                    settingsFragment.setIdText(darkID,state.remaining)
+
                 }
                 is InitState.Failed -> {
                     showErrorDialog(state.reason)
