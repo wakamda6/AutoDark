@@ -20,7 +20,6 @@ import com.autodark.extensions.initImmersionBar
 import com.autodark.model.InitState
 import com.autodark.model.InitViewModel
 import com.autodark.utils.LogUtils
-import com.autodark.utils.PermissionManager
 import kotlin.collections.ArrayList
 
 class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
@@ -124,6 +123,5 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         super.onResume()
         //证书检查
         viewModel.initCertificateCheck(darkID)
-//        PermissionManager.checkAllPermissions(this)
     }
 }

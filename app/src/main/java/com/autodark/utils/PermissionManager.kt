@@ -98,25 +98,6 @@ object PermissionManager {
         activity.startActivity(intent)
     }
 
-    //重启监听服务
-//    private fun toggleNotificationListenerService(context: Context) {
-//        val pm = context.packageManager
-//        val componentName = ComponentName(context, NotificationMonitorService::class.java)
-//
-//        pm.setComponentEnabledSetting(
-//            componentName,
-//            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-//            PackageManager.DONT_KILL_APP
-//        )
-//
-//        pm.setComponentEnabledSetting(
-//            componentName,
-//            PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-//            PackageManager.DONT_KILL_APP
-//        )
-//    }
-
-
     // 电池优化白名单
     private fun isIgnoringBatteryOptimizations(context: Context): Boolean {
         val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager

@@ -2,7 +2,6 @@ package com.autodark.service
 
 import com.autodark.utils.LogUtils
 import android.app.Notification
-import android.content.Context
 import android.content.Intent
 import android.os.BatteryManager
 import android.service.notification.NotificationListenerService
