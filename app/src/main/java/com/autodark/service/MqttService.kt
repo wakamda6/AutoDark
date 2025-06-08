@@ -111,7 +111,7 @@ class MqttService : Service(), Handler.Callback {
                 if (intent?.action == mqttPushAction) {
                     LogUtils.log(Log.DEBUG,kTag, "收到 打卡结果 广播：$message")
                     if (message != null) {
-                        publishMqttDarkResult(message,1)
+                        publishMqttDarkResult(message,2)
                     }
                 }
             }
@@ -171,7 +171,7 @@ class MqttService : Service(), Handler.Callback {
     //mqtt连接配置项
     private fun getMqttConnectOptions(): MqttConnectOptions {
         return MqttConnectOptions().apply {
-            isCleanSession = false
+            isCleanSession = true
             connectionTimeout = 20
             keepAliveInterval = 60
             userName = user
@@ -228,7 +228,7 @@ class MqttService : Service(), Handler.Callback {
 
         override fun connectComplete(reconnect: Boolean, serverURI: String?) {
             LogUtils.log(Log.INFO, kTag, if (reconnect) "重连成功" else "初次连接成功")
-            subscribeToTopics(arrayOf(mqttTopicCheckAppAlive, mqttTopicDark), intArrayOf(1, 1))
+            subscribeToTopics(arrayOf(mqttTopicCheckAppAlive, mqttTopicDark), intArrayOf(2, 2))
         }
 
         override fun messageArrived(topic: String?, message: MqttMessage?) {
@@ -242,7 +242,7 @@ class MqttService : Service(), Handler.Callback {
                 }
                 mqttTopicCheckAppAlive -> {
                     LogUtils.log(Log.DEBUG, kTag, "处理 $mqttTopicCheckAppAlive 消息，响应设备在线")
-                    publishMessage(mqttTopicCheckAppAliveResult, "darkPhone_alive", 1)
+                    publishMessage(mqttTopicCheckAppAliveResult, "darkPhone_alive", 2)
                 }
             }
         }
@@ -308,7 +308,7 @@ class MqttService : Service(), Handler.Callback {
     }
 
     //mqtt 发布
-    fun publishMessage(topic: String, message: String, qos: Int = 1) {
+    fun publishMessage(topic: String, message: String, qos: Int = 2) {
         LogUtils.log(Log.DEBUG,kTag, "尝试发布消息到主题 $topic: $message")
 
         try {
@@ -321,7 +321,7 @@ class MqttService : Service(), Handler.Callback {
         }
     }
 
-    fun publishMqttDarkResult(message: String, qos: Int = 1) {
+    fun publishMqttDarkResult(message: String, qos: Int = 2) {
         publishMessage(mqttTopicDarkResult,message,qos)
     }
 
