@@ -1,7 +1,11 @@
 package com.autodark.ui
 
 import android.app.AlertDialog
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import androidx.fragment.app.Fragment
 import com.autodark.R
@@ -12,6 +16,8 @@ import com.pengxh.kt.lite.extensions.show
 import android.util.Log
 import android.view.WindowManager
 import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.autodark.BaseApplication
@@ -19,7 +25,9 @@ import com.autodark.adapter.BaseFragmentAdapter
 import com.autodark.extensions.initImmersionBar
 import com.autodark.model.InitState
 import com.autodark.model.InitViewModel
+import com.autodark.service.MqttService
 import com.autodark.utils.LogUtils
+import com.autodark.utils.PermissionManager
 import kotlin.collections.ArrayList
 
 class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
@@ -80,6 +88,12 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                 is InitState.Success -> {
                     settingsFragment.setIdText(darkID,state.remaining)
 
+                    //mqtt启动
+                    if (state.forceRestartMqtt){
+                        restartMqttService()
+                    }else{
+                        startService(Intent(this, MqttService::class.java))
+                    }
                 }
                 is InitState.Failed -> {
                     showErrorDialog(state.reason)
@@ -118,10 +132,28 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             .show()
     }
 
+    //在证书验证失败删除证书后必须重启mqtt
+    private fun restartMqttService() {
+        LogUtils.log(Log.INFO, kTag, "重新启动mqtt服务")
+        // 先停止服务，触发 onDestroy（释放 MQTT 连接）
+        stopService(Intent(this, MqttService::class.java))
+
+        // 延迟几百毫秒后再重启，避免冲突
+        Handler(Looper.getMainLooper()).postDelayed({
+            startService(Intent(this, MqttService::class.java))
+        }, 1000)
+    }
+
+
     //正常返回桌面后再进入需要检测证书
     override fun onResume() {
         super.onResume()
         //证书检查
         viewModel.initCertificateCheck(darkID)
+    }
+
+    override fun onDestroy() {
+        PermissionManager.dismissDialog()
+        super.onDestroy()
     }
 }

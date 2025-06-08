@@ -1,4 +1,4 @@
-package com.autodark
+package com.autodark.ui
 
 import android.util.Log
 import com.autodark.utils.LogUtils
@@ -19,8 +19,10 @@ object MqttConfigHolder {
         val newHash = (p12Bytes.contentHashCode().toString() + caBytes.contentHashCode().toString())
 
         if (newHash == lastSslHash && mqttSslContext != null) {
-            LogUtils.log(Log.DEBUG, kTag, "SSLContext 无需重新初始化")
+            LogUtils.log(Log.DEBUG, kTag, "证书哈希值相同，SSLContext 无需重新初始化")
             return true
+        }else {
+            LogUtils.log(Log.DEBUG, kTag, "证书发生变化，SSLContext 重新初始化")
         }
 
         return try {
@@ -31,7 +33,6 @@ object MqttConfigHolder {
             val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm()).apply {
                 init(keyStore, p12Password)
             }
-            LogUtils.log(Log.DEBUG, kTag, "客户端证书导入成功")
 
             // CA证书
             val caCertificate = CertificateFactory.getInstance("X.509").generateCertificate(caBytes.inputStream())
@@ -42,7 +43,6 @@ object MqttConfigHolder {
             val trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply {
                 init(caKeyStore)
             }
-            LogUtils.log(Log.DEBUG, kTag, "CA证书导入成功")
 
             mqttSslContext = SSLContext.getInstance("TLSv1.2").apply {
                 init(keyManagerFactory.keyManagers, trustManagerFactory.trustManagers, null)

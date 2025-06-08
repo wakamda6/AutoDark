@@ -2,7 +2,8 @@ package com.autodark.utils
 
 import android.content.Context
 import android.util.Log
-import com.autodark.MqttConfigHolder
+import com.autodark.model.InitViewModel
+import com.autodark.ui.MqttConfigHolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.*
@@ -64,12 +65,14 @@ object CertificateManager  {
 
         //如果是证书被吊销，自动重试一次
         if (checkCertResult.status == CertCheckResult.Status.CAisRevoked) {
-            LogUtils.log(Log.ERROR, kTag, "证书被吊销")
             deleteCertFiles(clientEnPath, caEnPath)
+
+            //
+            InitViewModel.SharedMqttState.hasCertCheckFailedOnce = true
 
             // 自动重试一次
             return if (retryIfRevoked) {
-                LogUtils.log(Log.DEBUG, kTag, "检测到吊销后尝试重新获取证书")
+                LogUtils.log(Log.DEBUG, kTag, "检测到吊销，尝试重新获取证书")
                 getAndCheckCA(context, ID, retryIfRevoked = false)
             } else {
                 CertCheckResult(CertCheckResult.Status.CAisRevoked, "证书已被吊销")

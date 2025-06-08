@@ -19,6 +19,9 @@ object PermissionManager {
     private const val PREFS_NAME = "permission_prefs"
     private const val KEY_AUTO_START_REMINDER = "auto_start_reminder_shown"
 
+    // 声明一个变量保存AlertDialog引用
+    private var currentDialog: AlertDialog? = null
+
     //检查
     fun allPermissionsGranted(context: Context): Boolean {
         return Settings.canDrawOverlays(context) &&
@@ -175,12 +178,29 @@ object PermissionManager {
         message: String,
         onPositive: () -> Unit
     ) {
-        AlertDialog.Builder(activity)
+        // 先关闭之前的Dialog（防止多次弹出）
+        currentDialog?.dismiss()
+
+        currentDialog = AlertDialog.Builder(activity)
             .setTitle(title)
             .setMessage(message)
             .setCancelable(false)
-            .setPositiveButton("去授权") { _, _ -> onPositive() }
-            .setNegativeButton("退出") { _, _ -> activity.finish() }
-            .show()
+            .setPositiveButton("去授权") { _, _ ->
+                onPositive()
+                currentDialog = null
+            }
+            .setNegativeButton("退出") { _, _ ->
+                currentDialog?.dismiss()
+                currentDialog = null
+                activity.finish()
+            }
+            .create()
+
+        currentDialog?.show()
+    }
+
+    fun dismissDialog() {
+        currentDialog?.dismiss()
+        currentDialog = null
     }
 }
