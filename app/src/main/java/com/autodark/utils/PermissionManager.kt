@@ -16,9 +16,6 @@ import android.widget.Toast
 object PermissionManager {
     private const val kTag = "PermissionManager"
 
-    private const val PREFS_NAME = "permission_prefs"
-    private const val KEY_AUTO_START_REMINDER = "auto_start_reminder_shown"
-
     // 声明一个变量保存AlertDialog引用
     private var currentDialog: AlertDialog? = null
 
@@ -58,21 +55,6 @@ object PermissionManager {
             else -> {
                 onGranted?.invoke()
             }
-
-//            else -> {
-//                // 判断是否已提醒过自启动权限
-//                val prefs = activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-//                val alreadyReminded = prefs.getBoolean(KEY_AUTO_START_REMINDER, false)
-//                if (!alreadyReminded) {
-//                    showDialog(activity, "自启动权限", "为确保功能正常，请设置应用允许自启动") {
-//                        requestAutoStartPermission(activity)
-//                        // 记录已提醒，避免重复弹窗
-//                        prefs.edit().putBoolean(KEY_AUTO_START_REMINDER, true).apply()
-//                    }
-//                }
-//                // 如果已提醒过，就不再弹窗，避免循环
-//                Toast.makeText(activity, "所有权限已授予，请自行确认自启动权限是否打开", Toast.LENGTH_SHORT).show()
-//            }
         }
     }
 
@@ -115,62 +97,6 @@ object PermissionManager {
         }
         activity.startActivity(intent)
     }
-
-    // 自启动（厂商定制）
-    private fun requestAutoStartPermission(activity: Activity) {
-        try {
-            val intent = when {
-                Build.MANUFACTURER.equals("xiaomi", ignoreCase = true) -> {
-                    Intent().apply {
-                        component = ComponentName(
-                            "com.miui.securitycenter",
-                            "com.miui.permcenter.autostart.AutoStartManagementActivity"
-                        )
-                    }
-                }
-
-                Build.MANUFACTURER.equals("oppo", ignoreCase = true) -> {
-                    Intent().apply {
-                        component = ComponentName(
-                            "com.coloros.safecenter",
-                            "com.coloros.safecenter.permission.startup.StartupAppListActivity"
-                        )
-                    }
-                }
-
-                Build.MANUFACTURER.equals("vivo", ignoreCase = true) -> {
-                    Intent().apply {
-                        component = ComponentName(
-                            "com.vivo.permissionmanager",
-                            "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"
-                        )
-                    }
-                }
-
-                Build.MANUFACTURER.equals("huawei", ignoreCase = true) -> {
-                    Intent().apply {
-                        component = ComponentName(
-                            "com.huawei.systemmanager",
-                            "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"
-                        )
-                    }
-                }
-
-                else -> {
-                    // fallback：打开应用详情
-                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                        data = Uri.parse("package:${activity.packageName}")
-                    }
-                }
-            }
-
-            activity.startActivity(intent)
-        } catch (e: Exception) {
-            Toast.makeText(activity, "无法打开自启动设置，请手动配置", Toast.LENGTH_LONG).show()
-            e.printStackTrace()
-        }
-    }
-
 
     private fun showDialog(
         activity: Activity,

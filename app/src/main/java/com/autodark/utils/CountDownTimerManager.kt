@@ -1,6 +1,5 @@
 package com.autodark.utils
 
-import com.autodark.utils.LogUtils
 import android.content.Context
 import android.content.Intent
 import android.os.CountDownTimer
@@ -16,7 +15,6 @@ import com.autodark.service.FloatingWindowService
 import com.autodark.ui.MainActivity
 import com.pengxh.kt.lite.extensions.show
 import com.pengxh.kt.lite.extensions.timestampToCompleteDate
-import com.pengxh.kt.lite.extensions.timestampToTime
 import com.pengxh.kt.lite.utils.SaveKeyValues
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -26,7 +24,7 @@ import kotlinx.coroutines.withContext
 
 class CountDownTimerManager private constructor() : LifecycleOwner {
 
-    private val kTag = "AuToDark.CountDownTimerManager"
+    private val kTag = "CountDownTimerManager"
     private val registry = LifecycleRegistry(this)
 
     override val lifecycle: Lifecycle

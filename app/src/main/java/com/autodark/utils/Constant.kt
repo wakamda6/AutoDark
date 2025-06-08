@@ -4,10 +4,6 @@ object Constant {
     //发送者邮箱账号
     const val USER_MAIL_ACCOUNT = "***REMOVED***"
 
-    //ca
-    const val CLIENT_EN = "client.en"
-    const val CA_EN = "ca.en"
-
     //邮箱授权码，不是密码
     const val PERMISSION_CODE = "***REMOVED***"
 

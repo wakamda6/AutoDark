@@ -118,6 +118,7 @@ class FloatingWindowService : Service(), Handler.Callback {
         return START_STICKY
     }
 
+    @SuppressLint("SetTextI18n")
     override fun handleMessage(msg: Message): Boolean {
         when (msg.what) {
             2024071701 -> {

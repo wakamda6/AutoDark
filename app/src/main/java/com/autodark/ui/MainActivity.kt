@@ -2,7 +2,6 @@ package com.autodark.ui
 
 import android.app.AlertDialog
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -16,8 +15,6 @@ import com.pengxh.kt.lite.extensions.show
 import android.util.Log
 import android.view.WindowManager
 import androidx.activity.viewModels
-import androidx.annotation.RequiresApi
-import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.autodark.BaseApplication

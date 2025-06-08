@@ -1,5 +1,6 @@
 package com.autodark.fragment
 
+import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.app.AlertDialog
 import android.content.ComponentName
@@ -57,7 +58,8 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
     }
 
     //设置证书时长
-    fun setIdText(id: String,time: String) {
+    @SuppressLint("SetTextI18n")
+    fun setIdText(id: String, time: String) {
         this.id = id
         this.time = time
         if (isAdded) {
@@ -264,6 +266,7 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
         return null
     }
 
+    //检查悬浮窗服务和通知监听服务
     private fun ensureServicesAreRunning() {
         val context = requireContext()
         val serviceIntent = Intent(context, FloatingWindowService::class.java)
