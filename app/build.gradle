@@ -37,8 +37,8 @@ android {
     productFlavors {
         auto {
 //            debug
-            applicationId "com.autodark"
-//            applicationId = id
+//            applicationId "com.autodark"
+            applicationId = id
         }
     }
     packagingOptions {
@@ -71,9 +71,9 @@ android {
         variant.outputs.configureEach {
             def buildType = variant.buildType.name
             if (buildType == "release") {
-                outputFileName = "AutoDark" + getBuildDate() + "_" + defaultConfig.versionName + "_release.apk"
+                outputFileName = "AutoDark_" + getBuildDate() + "_v" + defaultConfig.versionName + "_release.apk"
             }else if (buildType == "debug") {
-                outputFileName = "AutoDark" + getBuildDate() + "_" + defaultConfig.versionName + "_debug.apk"
+                outputFileName = "AutoDark_" + getBuildDate() + "_v" + defaultConfig.versionName + "_debug.apk"
             }
         }
     }
@@ -90,7 +90,7 @@ static def createRandomCode() {
 }
 
 static def getBuildDate() {
-    def dateFormat = new java.text.SimpleDateFormat("yyyyMMdd_HH_mm", Locale.CHINA)
+    def dateFormat = new java.text.SimpleDateFormat("yyyyMMddHHmm", Locale.CHINA)
     return dateFormat.format(new Date())
 }
 

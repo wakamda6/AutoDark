@@ -1,13 +1,7 @@
 package com.autodark.utils
 
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
-import android.widget.Toast
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import org.eclipse.paho.client.mqttv3.IMqttActionListener
 import java.io.File
 import java.io.FileWriter
 import java.io.IOException

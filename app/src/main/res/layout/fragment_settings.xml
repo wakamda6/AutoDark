@@ -44,6 +44,16 @@
             android:textColor="#000000"
             android:gravity="start"/>
 
+        <TextView
+            android:id="@+id/tv_mqttStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="服务器连接状态：未连接"
+            android:padding="5dp"
+            android:textSize="15sp"
+            android:textColor="#000000"
+            android:gravity="start"/>
+
         <RelativeLayout
             android:id="@+id/emailLayout"
             android:layout_width="match_parent"

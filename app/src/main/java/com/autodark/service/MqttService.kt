@@ -24,13 +24,15 @@ import com.pengxh.kt.lite.extensions.timestampToCompleteDate
 import com.pengxh.kt.lite.utils.WeakReferenceHandler
 import android.content.Context
 import com.autodark.BaseApplication
+import com.autodark.model.MqttConnectionState
+import com.autodark.model.MqttStateHolder
 import com.autodark.ui.MqttConfigHolder
 import java.io.*
 
 /**
  * mqtt前台服务
  * */
-class MqttService : Service(), Handler.Callback {
+class MqttService() : Service(), Handler.Callback {
 
     var id:String = ""
     private var mqttClient: MqttAndroidClient? = null
@@ -128,6 +130,7 @@ class MqttService : Service(), Handler.Callback {
 
             override fun onLost(network: Network) {
                 // 网络丢失时可以选择执行其他操作
+                MqttStateHolder.mqttState.postValue(MqttConnectionState.ERROR)
             }
         }
         // 注册网络回调
@@ -154,6 +157,7 @@ class MqttService : Service(), Handler.Callback {
             }
         } else {
             LogUtils.log(Log.INFO, kTag, "MQTT 已连接，无需重复连接")
+            MqttStateHolder.mqttState.postValue(MqttConnectionState.CONNECTED)
         }
 
         return START_STICKY
@@ -194,12 +198,14 @@ class MqttService : Service(), Handler.Callback {
             LogUtils.log(Log.WARN, kTag, "网络不可用，无法连接到 MQTT 代理")
             return
         }
+        MqttStateHolder.mqttState.postValue(MqttConnectionState.CONNECTING)
 
         try {
             val options = getMqttConnectOptions()
 
             mqttClient?.connect(options, null, object : IMqttActionListener {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
+                    MqttStateHolder.mqttState.postValue(MqttConnectionState.CONNECTED)
                 }
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
@@ -210,10 +216,12 @@ class MqttService : Service(), Handler.Callback {
                     } else {
                         LogUtils.log(Log.ERROR, kTag, "未知错误: ${exception?.message}")
                     }
+                    MqttStateHolder.mqttState.postValue(MqttConnectionState.ERROR)
                 }
             })
         } catch (e: MqttException) {
             LogUtils.log(Log.ERROR, kTag, "MQTT 连接异常: ${e.message}")
+            MqttStateHolder.mqttState.postValue(MqttConnectionState.ERROR)
         }
     }
 
@@ -224,11 +232,13 @@ class MqttService : Service(), Handler.Callback {
             } else {
                 LogUtils.log(Log.ERROR, kTag, "MQTT 异常断开：${cause.message}")
             }
+            MqttStateHolder.mqttState.postValue(MqttConnectionState.DISCONNECTED)
         }
 
         override fun connectComplete(reconnect: Boolean, serverURI: String?) {
             LogUtils.log(Log.INFO, kTag, if (reconnect) "重连成功" else "初次连接成功")
             subscribeToTopics(arrayOf(mqttTopicCheckAppAlive, mqttTopicDark), intArrayOf(2, 2))
+            MqttStateHolder.mqttState.postValue(MqttConnectionState.CONNECTED)
         }
 
         override fun messageArrived(topic: String?, message: MqttMessage?) {
@@ -328,10 +338,22 @@ class MqttService : Service(), Handler.Callback {
     override fun onDestroy() {
         super.onDestroy()
         try {
-            // 取消订阅
-            unsubscribeFromTopics(arrayOf(mqttTopicCheckAppAlive, mqttTopicDark))
-            //断开连接
-            mqttClient?.disconnect()
+            if (isMqttConnected()){
+                // 取消订阅
+                unsubscribeFromTopics(arrayOf(mqttTopicCheckAppAlive, mqttTopicDark))
+                //断开连接
+                mqttClient?.disconnect(null, object : IMqttActionListener {
+                    override fun onSuccess(asyncActionToken: IMqttToken?) {
+                        LogUtils.log(Log.DEBUG, kTag, "MQTT 断开成功")
+                        mqttClient?.unregisterResources()
+                        MqttStateHolder.mqttState.postValue(MqttConnectionState.DISCONNECTED)
+                    }
+
+                    override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
+                        LogUtils.log(Log.ERROR, kTag, "断开连接失败: ${exception?.message}")
+                    }
+                })
+            }
             //注销广播
             LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver)
             // 注销网络回调

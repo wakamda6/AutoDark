@@ -1,10 +1,10 @@
 package com.autodark
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.provider.Settings
 import com.pengxh.kt.lite.utils.SaveKeyValues
 import com.tencent.bugly.crashreport.CrashReport
-import info.mqtt.android.service.MqttAndroidClient
 import kotlin.properties.Delegates
 
 class BaseApplication : Application() {
@@ -15,9 +15,8 @@ class BaseApplication : Application() {
     //mqtt设置
     lateinit var mqttServerUrl: String
     lateinit var mqttClientId: String
-    lateinit var user: String
-    lateinit var pwd: String
-    lateinit var mqttClient: MqttAndroidClient
+    private lateinit var user: String
+    private lateinit var pwd: String
     lateinit var mqttTopicCheckAppAlive: String
     lateinit var mqttTopicCheckAppAliveResult: String
     lateinit var mqttTopicDark: String
@@ -25,16 +24,16 @@ class BaseApplication : Application() {
     lateinit var mqttTopicLastWill: String
 
     companion object {
-        private var application: com.autodark.BaseApplication by Delegates.notNull()
+        private var application: BaseApplication by Delegates.notNull()
 
-        fun get() = com.autodark.BaseApplication.Companion.application
+        fun get() = application
     }
 
     lateinit var daoSession: com.autodark.greendao.DaoSession
 
     override fun onCreate() {
         super.onCreate()
-        com.autodark.BaseApplication.Companion.application = this
+        application = this
         SaveKeyValues.initSharedPreferences(this)
         CrashReport.initCrashReport(this, "ce38195468", false)
         initDataBase()
@@ -61,6 +60,7 @@ class BaseApplication : Application() {
     }
 
     //获取设备唯一ID
+    @SuppressLint("HardwareIds")
     private fun getUUID(): String {
         return Settings.Secure.getString(this.contentResolver, Settings.Secure.ANDROID_ID)
     }

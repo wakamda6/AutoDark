@@ -22,6 +22,8 @@ import com.autodark.adapter.BaseFragmentAdapter
 import com.autodark.extensions.initImmersionBar
 import com.autodark.model.InitState
 import com.autodark.model.InitViewModel
+import com.autodark.model.MqttConnectionState
+import com.autodark.model.MqttStateHolder
 import com.autodark.service.MqttService
 import com.autodark.utils.LogUtils
 import com.autodark.utils.PermissionManager
@@ -97,6 +99,25 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                 }
             }
         }
+
+        //mqtt状态监听
+        MqttStateHolder.mqttState.observe(this) { state ->
+            when (state) {
+                MqttConnectionState.CONNECTING -> {
+                    settingsFragment.setMqttText("正在连接")
+                }
+                MqttConnectionState.CONNECTED -> {
+                    settingsFragment.setMqttText("已连接")
+                }
+                MqttConnectionState.DISCONNECTED -> {
+                    settingsFragment.setMqttText("已断开连接")
+                }
+                MqttConnectionState.ERROR -> {
+                    settingsFragment.setMqttText("连接出错")
+                }
+            }
+        }
+
     }
 
     override fun observeRequestState() {

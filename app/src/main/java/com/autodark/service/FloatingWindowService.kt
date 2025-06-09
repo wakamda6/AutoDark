@@ -112,7 +112,7 @@ class FloatingWindowService : Service(), Handler.Callback {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val time = SaveKeyValues.getValue(Constant.TIMEOUT, "15s") as String
+        val time = SaveKeyValues.getValue(Constant.TIMEOUT, "30s") as String
         textView.text = time
         LogUtils.log(Log.DEBUG,kTag, "onStartCommand: 设置初始时间为 $time")
         return START_STICKY

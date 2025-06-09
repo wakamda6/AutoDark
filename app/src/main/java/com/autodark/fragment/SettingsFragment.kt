@@ -67,6 +67,12 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
             binding.tvTimeout.text = time
         }
     }
+    @SuppressLint("SetTextI18n")
+    fun setMqttText(mqttStatus:String) {
+        if (isAdded) {
+            binding.tvMqttStatus.text = "服务器连接状态：$mqttStatus"
+        }
+    }
 
     override fun initViewBinding(
         inflater: LayoutInflater, container: ViewGroup?
@@ -319,7 +325,7 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
         binding.emailTextView.text = emailAddress
         LogUtils.log(Log.DEBUG,kTag,"邮箱地址更新为: $emailAddress")
 
-        val timeout = SaveKeyValues.getValue(Constant.TIMEOUT, "15s") as String
+        val timeout = SaveKeyValues.getValue(Constant.TIMEOUT, "30s") as String
         binding.timeoutTextView.text = timeout
         LogUtils.log(Log.DEBUG,kTag,"超时设置更新为: $timeout")
     }
