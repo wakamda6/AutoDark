@@ -24,6 +24,7 @@ android {
             keyPassword project.hasProperty('KEY_PASSWORD') ? project.KEY_PASSWORD : ""
         }
     }
+    
 
     buildTypes {
         release {
