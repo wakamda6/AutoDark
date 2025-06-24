@@ -130,6 +130,25 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
                     }
                 }
             }
+            if (notice.contains("记得打卡")) {
+                // 发送打卡提醒邮件
+                if (emailAddress.isEmpty()) {
+                    LogUtils.log(Log.DEBUG,kTag, "邮箱地址为空")
+                    "邮箱地址为空".show(this)
+                    return
+                }
+
+                lifecycleScope.launch(Dispatchers.Main) {
+                    "即将发送通知邮件，请注意查收".show(this@NotificationMonitorService)
+                    withContext(Dispatchers.IO) {
+                        val subject = SaveKeyValues.getValue(
+                            Constant.EMAIL_TITLE, "打卡提醒"
+                        ) as String
+                        notice.createTextMail(subject, emailAddress).sendTextMail()
+                        LogUtils.log(Log.DEBUG, kTag, "邮件发送成功")
+                    }
+                }
+            }
         } else if (packageName in listOf(Constant.WECHAT, Constant.QQ, Constant.TIM, Constant.ZFB)) {
             if (notice.contains("电量")) {
                 if (emailAddress.isEmpty()) {

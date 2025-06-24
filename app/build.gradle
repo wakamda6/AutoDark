@@ -11,8 +11,8 @@ android {
         applicationId "com.autodark"
         minSdkVersion 24
         targetSdkVersion 33
-        versionCode 220
-        versionName "2.2.0"
+        versionCode 221
+        versionName "2.2.1"
         flavorDimensions "versionCode"
     }
 
@@ -91,7 +91,7 @@ static def createRandomCode() {
 }
 
 static def getBuildDate() {
-    def dateFormat = new java.text.SimpleDateFormat("yyyyMMddHHmm", Locale.CHINA)
+    def dateFormat = new SimpleDateFormat("yyyyMMddHHmm", Locale.CHINA)
     return dateFormat.format(new Date())
 }
 
