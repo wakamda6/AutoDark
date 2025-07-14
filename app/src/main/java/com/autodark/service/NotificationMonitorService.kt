@@ -89,6 +89,8 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
 
         if(notice != FOREGROUND_RUNNING_SERVICE_TITLE){
             LogUtils.log(Log.DEBUG,kTag, "内容 : $notice")
+        }else {
+            return
         }
 
         val notificationBean = com.autodark.bean.NotificationBean().apply {
