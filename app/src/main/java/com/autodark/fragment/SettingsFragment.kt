@@ -9,7 +9,10 @@ import android.content.Intent
 import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.TextUtils
 import com.autodark.R
 import com.autodark.databinding.FragmentSettingsBinding
@@ -135,27 +138,27 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
                 }).build().show()
         }
 
-        binding.openTestLayout.setOnClickListener {
-            LogUtils.log(Log.DEBUG,kTag, "打开测试布局被点击")
-            val packageManager = requireContext().packageManager
-            val resolveIntent = Intent(Intent.ACTION_MAIN, null)
-            resolveIntent.addCategory(Intent.CATEGORY_LAUNCHER)
-            resolveIntent.setPackage(Constant.DING_DING)
-            val apps = packageManager.queryIntentActivities(resolveIntent, 0)
-            val iterator: Iterator<ResolveInfo> = apps.iterator()
-            if (!iterator.hasNext()) {
-                LogUtils.log(Log.DEBUG,kTag, "没有找到钉钉应用")
-                return@setOnClickListener
-            }
-            val resolveInfo = iterator.next()
-            val intent = Intent(Intent.ACTION_MAIN)
-            intent.addCategory(Intent.CATEGORY_LAUNCHER)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            intent.component = ComponentName(
-                resolveInfo.activityInfo.packageName, resolveInfo.activityInfo.name
-            )
-            startActivity(intent)
-        }
+//        binding.openTestLayout.setOnClickListener {
+//            LogUtils.log(Log.DEBUG,kTag, "打开测试布局被点击")
+//            val packageManager = requireContext().packageManager
+//            val resolveIntent = Intent(Intent.ACTION_MAIN, null)
+//            resolveIntent.addCategory(Intent.CATEGORY_LAUNCHER)
+//            resolveIntent.setPackage(Constant.DING_DING)
+//            val apps = packageManager.queryIntentActivities(resolveIntent, 0)
+//            val iterator: Iterator<ResolveInfo> = apps.iterator()
+//            if (!iterator.hasNext()) {
+//                LogUtils.log(Log.DEBUG,kTag, "没有找到钉钉应用")
+//                return@setOnClickListener
+//            }
+//            val resolveInfo = iterator.next()
+//            val intent = Intent(Intent.ACTION_MAIN)
+//            intent.addCategory(Intent.CATEGORY_LAUNCHER)
+//            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+//            intent.component = ComponentName(
+//                resolveInfo.activityInfo.packageName, resolveInfo.activityInfo.name
+//            )
+//            startActivity(intent)
+//        }
 
         binding.turnoffLightSwitch.setOnCheckedChangeListener { _, isChecked ->
             LogUtils.log(Log.DEBUG,kTag, "亮度开关状态改变: $isChecked")
@@ -172,10 +175,10 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
             requireContext().navigatePageTo<NoticeRecordActivity>()
         }
 
-        binding.introduceLayout.setOnClickListener {
-            LogUtils.log(Log.DEBUG,kTag, "问答介绍布局被点击")
-            requireContext().navigatePageTo<QuestionAndAnswerActivity>()
-        }
+//        binding.introduceLayout.setOnClickListener {
+//            LogUtils.log(Log.DEBUG,kTag, "问答介绍布局被点击")
+//            requireContext().navigatePageTo<QuestionAndAnswerActivity>()
+//        }
 
         binding.idCodeLayout.setOnClickListener {
             LogUtils.log(Log.DEBUG,kTag, "二维码被点击")
@@ -192,21 +195,37 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
     }
 
     //防误触黑屏
+    @SuppressLint("SetTextI18n", "ClickableViewAccessibility")
     private fun showScreenCover() {
         if (screenCoverView != null) return
 
         val textView = TextView(requireContext()).apply {
-            setBackgroundColor(Color.BLACK)
-            text = "长按屏幕解锁"
-            setTextColor(Color.WHITE)
-            textSize = 18f
+            setBackgroundColor(Color.WHITE) // 白底
+            setTextColor(Color.BLACK)       // 黑字
+            text = "程序稳定性测试中\n请勿拔除充电器!!!"
+            textSize = 84f                  // 放大字体
             gravity = Gravity.CENTER
-            isClickable = true // 阻止触摸事件传递
+            setTypeface(typeface, Typeface.BOLD) // 粗体
+            isClickable = true
             isFocusable = true
 
-            setOnLongClickListener {
+            // 长按计时逻辑
+            val longPressDuration = 12000L // 5秒
+            val handler = Handler(Looper.getMainLooper())
+            val unlockRunnable = Runnable {
                 removeScreenCover()
-                true
+            }
+
+            setOnTouchListener { _, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        handler.postDelayed(unlockRunnable, longPressDuration)
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        handler.removeCallbacks(unlockRunnable)
+                    }
+                }
+                true // 消耗事件，防止传递
             }
         }
 
