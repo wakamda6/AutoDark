@@ -1,7 +1,11 @@
 package com.autodark.ui
 
 import android.app.AlertDialog
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -17,16 +21,23 @@ import android.view.WindowManager
 import androidx.activity.viewModels
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.lifecycleScope
 import com.autodark.BaseApplication
 import com.autodark.adapter.BaseFragmentAdapter
+import com.autodark.extensions.createTextMail
 import com.autodark.extensions.initImmersionBar
+import com.autodark.extensions.sendTextMail
 import com.autodark.model.InitState
 import com.autodark.model.InitViewModel
 import com.autodark.model.MqttConnectionState
 import com.autodark.model.MqttStateHolder
 import com.autodark.service.MqttService
+import com.autodark.utils.Constant
 import com.autodark.utils.LogUtils
 import com.autodark.utils.PermissionManager
+import com.pengxh.kt.lite.utils.SaveKeyValues
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlin.collections.ArrayList
 
 class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
@@ -44,6 +55,26 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     private val settingsFragment = SettingsFragment()
     private lateinit var insetsController: WindowInsetsControllerCompat
     private var clickTime: Long = 0
+
+    //电量检测广播
+    val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: return
+            val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            val batteryPct = level * 100 / scale
+
+            if (batteryPct <= 25) {
+                lifecycleScope.launch(Dispatchers.IO) {
+                    "当前手机剩余电量为：${batteryPct}%".createTextMail(
+                        "警告：电量过低！", emailAddress
+                    ).sendTextMail()
+                    LogUtils.log(Log.DEBUG,kTag, "警告：电量过低，电量邮件发送，剩余电量: $batteryPct%")
+                }
+            }
+
+        }
+    }
 
     init {
         fragmentPages.add(settingsFragment)
@@ -118,6 +149,10 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             }
         }
 
+        //电量
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        registerReceiver(batteryReceiver, filter)
+
     }
 
     override fun observeRequestState() {
@@ -172,6 +207,8 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
     override fun onDestroy() {
         PermissionManager.dismissDialog()
+        //电量
+        unregisterReceiver(batteryReceiver)
         super.onDestroy()
     }
 }

@@ -32,7 +32,7 @@ import java.io.*
 /**
  * mqtt前台服务
  * */
-class MqttService() : Service(), Handler.Callback {
+class MqttService : Service(), Handler.Callback {
 
     var id:String = ""
     private var mqttClient: MqttAndroidClient? = null
