@@ -57,7 +57,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     private var clickTime: Long = 0
 
     //电量检测广播
-    val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: return
@@ -65,16 +64,28 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             val batteryPct = level * 100 / scale
 
             if (batteryPct <= 25) {
+                // 在每次收到广播时重新获取邮箱地址
+                val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
+
+                if (emailAddress.isBlank()) {
+                    LogUtils.log(Log.WARN, kTag, "警告：邮箱地址为空，电量邮件未发送")
+                    return
+                }
+
                 lifecycleScope.launch(Dispatchers.IO) {
-                    "当前手机剩余电量为：${batteryPct}%".createTextMail(
-                        "警告：电量过低！", emailAddress
-                    ).sendTextMail()
-                    LogUtils.log(Log.DEBUG,kTag, "警告：电量过低，电量邮件发送，剩余电量: $batteryPct%")
+                    try {
+                        "当前手机剩余电量为：${batteryPct}%".createTextMail(
+                            "警告：电量过低！", emailAddress
+                        ).sendTextMail()
+                        LogUtils.log(Log.DEBUG, kTag, "警告：电量过低，电量邮件发送，剩余电量: $batteryPct%")
+                    } catch (e: Exception) {
+                        LogUtils.log(Log.ERROR, kTag, "发送电量邮件失败: ${e.message}")
+                    }
                 }
             }
-
         }
     }
+
 
     init {
         fragmentPages.add(settingsFragment)
@@ -134,17 +145,18 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         //mqtt状态监听
         MqttStateHolder.mqttState.observe(this) { state ->
             when (state) {
-                MqttConnectionState.CONNECTING -> {
+                is MqttConnectionState.CONNECTING -> {
                     settingsFragment.setMqttText("正在连接")
                 }
-                MqttConnectionState.CONNECTED -> {
+                is MqttConnectionState.CONNECTED -> {
                     settingsFragment.setMqttText("已连接")
                 }
-                MqttConnectionState.DISCONNECTED -> {
+                is MqttConnectionState.DISCONNECTED -> {
                     settingsFragment.setMqttText("已断开连接")
                 }
-                MqttConnectionState.ERROR -> {
-                    settingsFragment.setMqttText("连接出错")
+                is MqttConnectionState.ERROR -> {
+                    settingsFragment.setMqttText("连接错误")
+                    sendMqttErrorEmail(state.message)
                 }
             }
         }
@@ -153,6 +165,28 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         registerReceiver(batteryReceiver, filter)
 
+    }
+
+    // 发送mqtt连接失败邮件
+    private fun sendMqttErrorEmail(message: String) {
+        // 动态获取邮箱地址
+        val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
+
+        if (emailAddress.isBlank()) {
+            LogUtils.log(Log.WARN, kTag, "警告：邮箱地址为空，电量邮件未发送")
+            return
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                "mqtt连接出错：${message}".createTextMail(
+                    "警告：mqtt连接出错！", emailAddress
+                ).sendTextMail()
+                LogUtils.log(Log.DEBUG, kTag, message)
+            } catch (e: Exception) {
+                LogUtils.log(Log.ERROR, kTag, "发送mqtt连接失败邮件失败: ${e.message}")
+            }
+        }
     }
 
     override fun observeRequestState() {

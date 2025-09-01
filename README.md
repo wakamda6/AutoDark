@@ -1,7 +1,7 @@
 # AutoDark
 
 ## 版本信息
-![版本](https://img.shields.io/badge/version-v2.2.2-blue)
+![版本](https://img.shields.io/badge/version-v2.2.3-blue)
 
 [查看完整版本日志](CHANGELOG.md)
 
