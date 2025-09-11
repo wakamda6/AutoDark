@@ -5,6 +5,7 @@ import androidx.lifecycle.MutableLiveData
 sealed class MqttConnectionState {
     object CONNECTING : MqttConnectionState()
     object CONNECTED : MqttConnectionState()
+    object RECONNECTED : MqttConnectionState()
     object DISCONNECTED: MqttConnectionState()
     data class ERROR(val message: String) : MqttConnectionState()
 }

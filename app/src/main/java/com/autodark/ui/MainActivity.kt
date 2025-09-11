@@ -151,12 +151,16 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                 is MqttConnectionState.CONNECTED -> {
                     settingsFragment.setMqttText("已连接")
                 }
+                is MqttConnectionState.RECONNECTED -> {
+                    settingsFragment.setMqttText("已连接")
+                    sendMqttStateEmail(true,"")
+                }
                 is MqttConnectionState.DISCONNECTED -> {
                     settingsFragment.setMqttText("已断开连接")
                 }
                 is MqttConnectionState.ERROR -> {
                     settingsFragment.setMqttText("连接错误")
-                    sendMqttErrorEmail(state.message)
+                    sendMqttStateEmail(false,state.message)
                 }
             }
         }
@@ -168,7 +172,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     }
 
     // 发送mqtt连接失败邮件
-    private fun sendMqttErrorEmail(message: String) {
+    private fun sendMqttStateEmail(isReconnect: Boolean, message: String) {
         // 动态获取邮箱地址
         val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
 
@@ -177,14 +181,27 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             return
         }
 
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                "mqtt连接出错：${message}".createTextMail(
-                    "警告：mqtt连接出错！", emailAddress
-                ).sendTextMail()
-                LogUtils.log(Log.DEBUG, kTag, message)
-            } catch (e: Exception) {
-                LogUtils.log(Log.ERROR, kTag, "发送mqtt连接失败邮件失败: ${e.message}")
+        if (isReconnect){
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    "mqtt重连成功".createTextMail(
+                        "mqtt恢复连接：mqtt重连成功", emailAddress
+                    ).sendTextMail()
+                    LogUtils.log(Log.DEBUG, kTag, message)
+                } catch (e: Exception) {
+                    LogUtils.log(Log.ERROR, kTag, "发送mqtt连接失败邮件失败: ${e.message}")
+                }
+            }
+        }else {
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    "mqtt连接出错：${message}".createTextMail(
+                        "警告：mqtt连接出错！", emailAddress
+                    ).sendTextMail()
+                    LogUtils.log(Log.DEBUG, kTag, message)
+                } catch (e: Exception) {
+                    LogUtils.log(Log.ERROR, kTag, "发送mqtt连接失败邮件失败: ${e.message}")
+                }
             }
         }
     }

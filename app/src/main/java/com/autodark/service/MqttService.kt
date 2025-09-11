@@ -210,7 +210,7 @@ class MqttService : Service(), Handler.Callback {
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
                     if (exception is MqttException) {
-                        LogUtils.log(Log.ERROR, kTag, "MQTT 通信失败: ${exception.message}")
+                        LogUtils.log(Log.ERROR, kTag, "MQTT 连接失败: ${exception.message}")
                         LogUtils.log(Log.ERROR, kTag, "错误码: ${exception.reasonCode}")
                         exception.printStackTrace()
                         MqttStateHolder.mqttState.postValue(MqttConnectionState.ERROR("连接失败：${exception.message}\n错误码: ${exception.reasonCode}"))
@@ -238,9 +238,13 @@ class MqttService : Service(), Handler.Callback {
         }
 
         override fun connectComplete(reconnect: Boolean, serverURI: String?) {
-            LogUtils.log(Log.INFO, kTag, if (reconnect) "重连成功" else "初次连接成功")
+            if (reconnect) {
+                MqttStateHolder.mqttState.postValue(MqttConnectionState.RECONNECTED)
+            }else{
+                MqttStateHolder.mqttState.postValue(MqttConnectionState.CONNECTED)
+            }
             subscribeToTopics(arrayOf(mqttTopicCheckAppAlive, mqttTopicDark), intArrayOf(2, 2))
-            MqttStateHolder.mqttState.postValue(MqttConnectionState.CONNECTED)
+            LogUtils.log(Log.INFO, kTag, if (reconnect) "重连成功" else "初次连接成功")
         }
 
         override fun messageArrived(topic: String?, message: MqttMessage?) {
