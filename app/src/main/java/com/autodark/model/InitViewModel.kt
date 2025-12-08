@@ -44,9 +44,9 @@ class InitViewModel(application: Application) : AndroidViewModel(application) {
                             SharedMqttState.hasCertCheckFailedOnce = true
                             _initState.postValue(InitState.Failed("证书已过期\n请联系开发者 ID:$ID"))
                         }
-                        CertCheckResult.Status.CheckCertRevokedError -> {
+                        CertCheckResult.Status.CheckCRLError -> {
                             SharedMqttState.hasCertCheckFailedOnce = true
-                            _initState.postValue(InitState.Failed("证书验证错误\n请联系开发者 ID:$ID"))
+                            _initState.postValue(InitState.Failed("CRL文件获取错误\n请联系开发者 ID:$ID"))
                         }
                         CertCheckResult.Status.SSLError -> {
                             SharedMqttState.hasCertCheckFailedOnce = true

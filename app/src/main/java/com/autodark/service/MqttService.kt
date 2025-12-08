@@ -32,7 +32,7 @@ import java.io.*
 /**
  * mqtt前台服务
  * */
-class MqttService() : Service(), Handler.Callback {
+class MqttService : Service(), Handler.Callback {
 
     var id:String = ""
     private var mqttClient: MqttAndroidClient? = null
@@ -130,7 +130,7 @@ class MqttService() : Service(), Handler.Callback {
 
             override fun onLost(network: Network) {
                 // 网络丢失时可以选择执行其他操作
-                MqttStateHolder.mqttState.postValue(MqttConnectionState.ERROR)
+                MqttStateHolder.mqttState.postValue(MqttConnectionState.ERROR("无网络"))
             }
         }
         // 注册网络回调
@@ -210,18 +210,20 @@ class MqttService() : Service(), Handler.Callback {
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
                     if (exception is MqttException) {
-                        LogUtils.log(Log.ERROR, kTag, "MQTT 通信失败: ${exception.message}")
+                        LogUtils.log(Log.ERROR, kTag, "MQTT 连接失败: ${exception.message}")
                         LogUtils.log(Log.ERROR, kTag, "错误码: ${exception.reasonCode}")
                         exception.printStackTrace()
+                        MqttStateHolder.mqttState.postValue(MqttConnectionState.ERROR("连接失败：${exception.message}\n错误码: ${exception.reasonCode}"))
                     } else {
                         LogUtils.log(Log.ERROR, kTag, "未知错误: ${exception?.message}")
+                        MqttStateHolder.mqttState.postValue(MqttConnectionState.ERROR("连接失败：未知错误: ${exception?.message}"))
                     }
-                    MqttStateHolder.mqttState.postValue(MqttConnectionState.ERROR)
+
                 }
             })
         } catch (e: MqttException) {
             LogUtils.log(Log.ERROR, kTag, "MQTT 连接异常: ${e.message}")
-            MqttStateHolder.mqttState.postValue(MqttConnectionState.ERROR)
+            MqttStateHolder.mqttState.postValue(MqttConnectionState.ERROR("连接失败：MQTT 连接异常: ${e.message}"))
         }
     }
 
@@ -231,14 +233,18 @@ class MqttService() : Service(), Handler.Callback {
                 LogUtils.log(Log.INFO, kTag, "MQTT 已正常断开")
             } else {
                 LogUtils.log(Log.ERROR, kTag, "MQTT 异常断开：${cause.message}")
+                MqttStateHolder.mqttState.postValue(MqttConnectionState.ERROR("连接断开：异常断开：${cause.message}"))
             }
-            MqttStateHolder.mqttState.postValue(MqttConnectionState.DISCONNECTED)
         }
 
         override fun connectComplete(reconnect: Boolean, serverURI: String?) {
-            LogUtils.log(Log.INFO, kTag, if (reconnect) "重连成功" else "初次连接成功")
+            if (reconnect) {
+                MqttStateHolder.mqttState.postValue(MqttConnectionState.RECONNECTED)
+            }else{
+                MqttStateHolder.mqttState.postValue(MqttConnectionState.CONNECTED)
+            }
             subscribeToTopics(arrayOf(mqttTopicCheckAppAlive, mqttTopicDark), intArrayOf(2, 2))
-            MqttStateHolder.mqttState.postValue(MqttConnectionState.CONNECTED)
+            LogUtils.log(Log.INFO, kTag, if (reconnect) "重连成功" else "初次连接成功")
         }
 
         override fun messageArrived(topic: String?, message: MqttMessage?) {

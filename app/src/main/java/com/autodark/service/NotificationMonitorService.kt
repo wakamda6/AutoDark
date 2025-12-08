@@ -81,12 +81,14 @@ class NotificationMonitorService : NotificationListenerService(), LifecycleOwner
         // 获取接收消息的内容
         val notice = extras.getString(Notification.EXTRA_TEXT)
 
+        //过滤空通知
         if (notice.isNullOrBlank()) {
             LogUtils.log(Log.DEBUG, kTag, "通知发出者包名: $packageName")
             LogUtils.log(Log.DEBUG,kTag, "通知内容为空，忽略")
             return
         }
 
+        //过滤本应用通知
         if(notice != FOREGROUND_RUNNING_SERVICE_TITLE){
             LogUtils.log(Log.DEBUG,kTag, "内容 : $notice")
         }else {

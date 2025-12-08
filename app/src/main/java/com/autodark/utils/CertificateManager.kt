@@ -29,7 +29,7 @@ data class CertCheckResult(
         CAGetFailed,
         CADecodeFailed,
         CAisRevoked,
-        CheckCertRevokedError,
+        CheckCRLError,
         SSLError
     }
 }
@@ -168,7 +168,8 @@ object CertificateManager  {
             val clientCert = keyStore.getCertificate(alias) as X509Certificate
 
             val crl = withContext(Dispatchers.IO) {
-                val url = URL("https://***REMOVED***/crl/crl.pem")
+//                val url = URL("https://***REMOVED***/crl/crl.pem")
+                val url = URL("https://fake-test-domain-xyz987654321.com/crl.pem")
                 val inputStream = url.openStream()
                 CertificateFactory.getInstance("X.509").generateCRL(inputStream) as X509CRL
             }
@@ -182,9 +183,9 @@ object CertificateManager  {
             return CertCheckResult(CertCheckResult.Status.CASuccess, remaining)
 
         } catch (e: Exception) {
-            LogUtils.log(Log.WARN,kTag, "P12 证书加载失败: ${e.message}")
+            LogUtils.log(Log.WARN,kTag, "crl文件加载失败: ${e.message}")
             e.printStackTrace()
-            CertCheckResult(CertCheckResult.Status.CheckCertRevokedError)
+            CertCheckResult(CertCheckResult.Status.CheckCRLError)
         }
     }
 
