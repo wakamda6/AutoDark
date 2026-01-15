@@ -44,7 +44,7 @@ object MqttConfigHolder {
                 init(caKeyStore)
             }
 
-            mqttSslContext = SSLContext.getInstance("TLSv1.2").apply {
+            mqttSslContext = SSLContext.getInstance("TLSv1.3").apply {
                 init(keyManagerFactory.keyManagers, trustManagerFactory.trustManagers, null)
             }
             lastSslHash = newHash
