@@ -56,6 +56,8 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     private lateinit var insetsController: WindowInsetsControllerCompat
     private var clickTime: Long = 0
 
+    // 1. 在 Activity 或全局定义一个标记位
+    private var hasSentLowBatteryWarning = false
     //电量检测广播
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -64,23 +66,31 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             val batteryPct = level * 100 / scale
 
             if (batteryPct <= 25) {
-                // 在每次收到广播时重新获取邮箱地址
-                val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
+                // 2. 检查是否已经发过警报
+                if (!hasSentLowBatteryWarning) {
+                    // 在每次收到广播时重新获取邮箱地址
+                    val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
 
-                if (emailAddress.isBlank()) {
-                    LogUtils.log(Log.WARN, kTag, "警告：邮箱地址为空，电量邮件未发送")
-                    return
-                }
-
-                lifecycleScope.launch(Dispatchers.IO) {
-                    try {
-                        "当前手机剩余电量为：${batteryPct}%".createTextMail(
-                            "警告：电量过低！", emailAddress
-                        ).sendTextMail()
-                        LogUtils.log(Log.DEBUG, kTag, "警告：电量过低，电量邮件发送，剩余电量: $batteryPct%")
-                    } catch (e: Exception) {
-                        LogUtils.log(Log.ERROR, kTag, "发送电量邮件失败: ${e.message}")
+                    if (emailAddress.isBlank()) {
+                        LogUtils.log(Log.WARN, kTag, "警告：邮箱地址为空，电量邮件未发送")
+                        return
                     }
+
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        try {
+                            "当前手机剩余电量为：${batteryPct}%".createTextMail(
+                                "警告：电量过低！", emailAddress
+                            ).sendTextMail()
+                            // 3. 发送成功后，标记为已发送
+                            hasSentLowBatteryWarning = true
+                            LogUtils.log(Log.DEBUG, kTag, "警告：电量过低，电量邮件发送，剩余电量: $batteryPct%")
+                        } catch (e: Exception) {
+                            LogUtils.log(Log.ERROR, kTag, "发送电量邮件失败: ${e.message}")
+                        }
+                    }
+                } else if (batteryPct > 30) {
+                    // 4. 当电量回升到 30% 以上时（正在充电），重置标记位，准备下次 25% 再次预警
+                    hasSentLowBatteryWarning = false
                 }
             }
         }
