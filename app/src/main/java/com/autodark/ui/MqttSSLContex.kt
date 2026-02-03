@@ -30,6 +30,46 @@ object MqttConfigHolder {
             val keyStore = KeyStore.getInstance("PKCS12").apply {
                 load(p12Bytes.inputStream(), p12Password)
             }
+
+            // ===== 打印客户端证书域名信息 =====
+            val aliases = keyStore.aliases()
+            while (aliases.hasMoreElements()) {
+                val alias = aliases.nextElement()
+                val cert = keyStore.getCertificate(alias)
+
+                if (cert is java.security.cert.X509Certificate) {
+                    // 1️⃣ Subject DN（含 CN）
+                    LogUtils.log(
+                        Log.DEBUG,
+                        kTag,
+                        "客户端证书 Subject: ${cert.subjectX500Principal.name}"
+                    )
+
+                    // 2️⃣ SAN（Subject Alternative Name）
+                    val sanList = cert.subjectAlternativeNames
+                    if (sanList != null) {
+                        for (san in sanList) {
+                            val type = san[0] as Int
+                            val value = san[1]
+
+                            val typeName = when (type) {
+                                2 -> "DNS"
+                                7 -> "IP"
+                                else -> "OTHER($type)"
+                            }
+
+                            LogUtils.log(
+                                Log.DEBUG,
+                                kTag,
+                                "客户端证书 SAN: $typeName = $value"
+                            )
+                        }
+                    } else {
+                        LogUtils.log(Log.DEBUG, kTag, "客户端证书无 SAN 扩展")
+                    }
+                }
+            }
+
             val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm()).apply {
                 init(keyStore, p12Password)
             }
