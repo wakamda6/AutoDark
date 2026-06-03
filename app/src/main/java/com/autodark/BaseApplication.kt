@@ -42,7 +42,7 @@ class BaseApplication : Application() {
         androidId = getUUID()
 
         //获取订阅主题
-        mqttServerUrl = "ssl://autodark.wakamda.fun:8883"
+        mqttServerUrl = "ssl://autodark.***REMOVED***:8883"
         mqttClientId = androidId
         mqttTopicCheckAppAlive = "/topic/$androidId/checkAppAlive"
         mqttTopicCheckAppAliveResult = "/topic/$androidId/checkAppAliveResult"

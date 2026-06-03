@@ -41,7 +41,7 @@ object CertificateManager  {
     suspend fun getAndCheckCA(context: Context, ID: String, retryIfRevoked: Boolean = true): CertCheckResult {
         val clientEnPath = File(context.filesDir, "$ID.en")
         val caEnPath = File(context.filesDir, "ca.en")
-        val baseUrl = "https://autodark.wakamda.fun/certs/${ID}/en_${ID}"
+        val baseUrl = "https://autodark.***REMOVED***/certs/${ID}/en_${ID}"
         val clientEnUrl = "$baseUrl/${ID}.en"
         val caEnUrl = "$baseUrl/ca.en"
 
@@ -168,7 +168,7 @@ object CertificateManager  {
             val clientCert = keyStore.getCertificate(alias) as X509Certificate
 
             val crl = withContext(Dispatchers.IO) {
-                val url = URL("https://autodark.wakamda.fun/crl/crl.pem")
+                val url = URL("https://autodark.***REMOVED***/crl/crl.pem")
                 val inputStream = url.openStream()
                 CertificateFactory.getInstance("X.509").generateCRL(inputStream) as X509CRL
             }
