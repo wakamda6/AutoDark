@@ -2,6 +2,7 @@ package com.autodark
 
 import android.annotation.SuppressLint
 import android.app.Application
+import android.content.Context
 import android.provider.Settings
 import com.pengxh.kt.lite.utils.SaveKeyValues
 import com.tencent.bugly.crashreport.CrashReport
@@ -13,7 +14,6 @@ class BaseApplication : Application() {
     var caTimes:String = ""
 
     //mqtt设置
-    lateinit var mqttServerUrl: String
     lateinit var mqttClientId: String
     private lateinit var user: String
     private lateinit var pwd: String
@@ -27,7 +27,20 @@ class BaseApplication : Application() {
         private var application: BaseApplication by Delegates.notNull()
 
         fun get() = application
+        const val PREF_NAME = "app_prefs"
+        const val KEY_DOMAIN = "DOMAIN_ADDRESS"
     }
+
+    // 动态获取或设置域名
+    var domainAddress: String
+        get() {
+            val sp = getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            return sp.getString(KEY_DOMAIN, "") ?: ""
+        }
+        set(value) {
+            val sp = getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            sp.edit().putString(KEY_DOMAIN, value.trim()).apply()
+        }
 
     lateinit var daoSession: com.autodark.greendao.DaoSession
 
@@ -42,7 +55,6 @@ class BaseApplication : Application() {
         androidId = getUUID()
 
         //获取订阅主题
-        mqttServerUrl = "ssl://autodark.***REMOVED***:8883"
         mqttClientId = androidId
         mqttTopicCheckAppAlive = "/topic/$androidId/checkAppAlive"
         mqttTopicCheckAppAliveResult = "/topic/$androidId/checkAppAliveResult"

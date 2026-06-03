@@ -9,6 +9,7 @@ import android.os.BatteryManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.InputType
 import android.view.KeyEvent
 import androidx.fragment.app.Fragment
 import com.autodark.R
@@ -18,6 +19,7 @@ import com.pengxh.kt.lite.base.KotlinBaseActivity
 import com.pengxh.kt.lite.extensions.show
 import android.util.Log
 import android.view.WindowManager
+import android.widget.EditText
 import androidx.activity.viewModels
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -88,9 +90,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                             LogUtils.log(Log.ERROR, kTag, "发送电量邮件失败: ${e.message}")
                         }
                     }
-                } else if (batteryPct > 30) {
-                    // 4. 当电量回升到 30% 以上时（正在充电），重置标记位，准备下次 25% 再次预警
-                    hasSentLowBatteryWarning = false
                 }
             }
         }
@@ -116,18 +115,72 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
     }
 
+    /**
+     * 显示域名输入弹窗
+     * @param isFirstTime 是否是第一次启动强制输入
+     * @param defaultDomain 修改域名时的默认值
+     */
+    private fun showDomainInputDialog(isFirstTime: Boolean, defaultDomain: String = "") {
+        val app = applicationContext as BaseApplication
 
-    override fun initOnCreate(savedInstanceState: Bundle?) {
+        // 动态创建输入框（使用了推荐的单行替代写法）
+        val inputEditText = EditText(this).apply {
+            setText(defaultDomain)
+            hint = "请输入域名 (例如: example.com)"
+            maxLines = 1
+            inputType = InputType.TYPE_CLASS_TEXT
+            if (defaultDomain.isNotEmpty()) setSelection(defaultDomain.length)
+        }
 
-        // 初始化 LogUtils
-        LogUtils.initialize(this)
+        val builder = AlertDialog.Builder(this)
+            .setTitle(if (isFirstTime) "首次启动配置" else "修改域名")
+            .setMessage("请输入服务器域名以继续使用：")
+            .setView(inputEditText)
+            .setCancelable(false)
+            .setPositiveButton("确定", null)
 
-        // 测试日志输出
-        LogUtils.log(Log.INFO, kTag, "应用启动成功")
+        if (!isFirstTime) {
+            // 【核心修改点】：如果用户点击取消，重新弹出错误对话框，维持原有的错误状态
+            builder.setNegativeButton("取消") { _, _ ->
+                // 从 ViewModel 里的最后状态获取错误原因，如果没有就传空
+                val reason = (viewModel.initState.value as? InitState.Failed)?.reason ?: "证书验证失败"
+                showErrorDialog(reason, app.domainAddress)
+            }
+        } else {
+            // 第一次启动如果不输入，提供一个退出应用的选项
+            builder.setNegativeButton("退出应用") { _, _ -> finish() }
+        }
 
-        //id获取
-        darkID = (applicationContext as BaseApplication).androidId
-        caTimes = (applicationContext as BaseApplication).caTimes
+        val dialog = builder.create()
+        dialog.show()
+
+        // 动态拦截 Positive 按钮，防止用户输入空格或留空
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val inputDomain = inputEditText.text.toString().trim()
+            if (inputDomain.isEmpty()) {
+                inputEditText.error = "域名不能为空！"
+            } else {
+                // 保存域名到 BaseApplication (SharedPreferences)
+                app.domainAddress = inputDomain
+                dialog.dismiss()
+
+                if (isFirstTime) {
+                    // 首次输入成功，继续后续的生命周期和初始化
+                    proceedWithInitialization()
+                } else {
+                    // 修改域名成功，重新触发证书验证
+                    viewModel.initCertificateCheck(darkID)
+                }
+            }
+        }
+    }
+
+    private fun proceedWithInitialization() {
+        val app = applicationContext as BaseApplication
+
+        // id获取
+        darkID = app.androidId
+        caTimes = app.caTimes
 
         val fragmentAdapter = BaseFragmentAdapter(supportFragmentManager, fragmentPages)
         binding.viewPager.adapter = fragmentAdapter
@@ -147,7 +200,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     }
                 }
                 is InitState.Failed -> {
-                    showErrorDialog(state.reason)
+                    showErrorDialog(state.reason, app.domainAddress)
                 }
             }
         }
@@ -179,6 +232,26 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         registerReceiver(batteryReceiver, filter)
 
+        // 触发首次证书验证
+        viewModel.initCertificateCheck(darkID)
+    }
+
+    override fun initOnCreate(savedInstanceState: Bundle?) {
+
+        // 初始化 LogUtils
+        LogUtils.initialize(this)
+        // 测试日志输出
+        LogUtils.log(Log.INFO, kTag, "应用启动成功")
+
+        // 2. 检查域名是否存在
+        val app = applicationContext as BaseApplication
+        if (app.domainAddress.isEmpty()) {
+            // 没有域名，强制要求用户输入
+            showDomainInputDialog(isFirstTime = true)
+        } else {
+            // 已经有域名，直接进入后续逻辑
+            proceedWithInitialization()
+        }
     }
 
     // 发送mqtt连接失败邮件
@@ -232,13 +305,17 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         } else super.onKeyDown(keyCode, event)
     }
 
-    private fun showErrorDialog(reason: String) {
+    private fun showErrorDialog(reason: String, currentDomain: String) {
         AlertDialog.Builder(this)
             .setTitle("初始化失败")
             .setMessage(reason)
             .setCancelable(false)
             .setPositiveButton("重试") { _, _ ->
                 viewModel.initCertificateCheck(darkID)
+            }
+            .setNeutralButton("修改域名") { _, _ ->
+                // 打开输入框，并传入当前域名作为默认值
+                showDomainInputDialog(isFirstTime = false, defaultDomain = currentDomain)
             }
             .setNegativeButton("退出") { _, _ ->
                 finish()

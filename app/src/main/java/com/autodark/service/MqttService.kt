@@ -72,7 +72,8 @@ class MqttService : Service(), Handler.Callback {
         id = (applicationContext as BaseApplication).androidId
 
         // MQTT 配置文件导入
-        mqttServerUrl = (applicationContext as BaseApplication).mqttServerUrl
+        val currentDomain = (applicationContext as BaseApplication).domainAddress
+        mqttServerUrl = "ssl://${currentDomain}:8883"
         mqttClientId = (applicationContext as BaseApplication).mqttClientId
         mqttTopicCheckAppAlive = (applicationContext as BaseApplication).mqttTopicCheckAppAlive
         mqttTopicCheckAppAliveResult = (applicationContext as BaseApplication).mqttTopicCheckAppAliveResult

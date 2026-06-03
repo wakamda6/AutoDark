@@ -2,6 +2,7 @@ package com.autodark.utils
 
 import android.content.Context
 import android.util.Log
+import com.autodark.BaseApplication
 import com.autodark.model.InitViewModel
 import com.autodark.ui.MqttConfigHolder
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +42,9 @@ object CertificateManager  {
     suspend fun getAndCheckCA(context: Context, ID: String, retryIfRevoked: Boolean = true): CertCheckResult {
         val clientEnPath = File(context.filesDir, "$ID.en")
         val caEnPath = File(context.filesDir, "ca.en")
-        val baseUrl = "https://autodark.***REMOVED***/certs/${ID}/en_${ID}"
+        val app = context.applicationContext as BaseApplication
+        val currentDomain = app.domainAddress // 用这个变量去拼接你的请求 URL
+        val baseUrl = "https://${currentDomain}/certs/${ID}/en_${ID}"
         val clientEnUrl = "$baseUrl/${ID}.en"
         val caEnUrl = "$baseUrl/ca.en"
 
@@ -61,7 +64,7 @@ object CertificateManager  {
         }
 
         //3加载并验证证书
-        val checkCertResult = checkCertRevoked(p12Bytes, ID)
+        val checkCertResult = checkCertRevoked(currentDomain,p12Bytes, ID)
 
         //如果是证书被吊销，自动重试一次
         if (checkCertResult.status == CertCheckResult.Status.CAisRevoked) {
@@ -155,7 +158,7 @@ object CertificateManager  {
     }
 
     //3. 加载并验证证书：获取剩余时长并返回，失败则返回验证失败，等待后续添加吊销后重新下载一次的逻辑
-    private suspend fun checkCertRevoked(bytes: ByteArray, ID: String): CertCheckResult  {
+    private suspend fun checkCertRevoked(currentDomain: String, bytes: ByteArray, ID: String): CertCheckResult  {
 
         val p12P = ID.toCharArray()
         val keyStore = KeyStore.getInstance("PKCS12")
@@ -168,7 +171,7 @@ object CertificateManager  {
             val clientCert = keyStore.getCertificate(alias) as X509Certificate
 
             val crl = withContext(Dispatchers.IO) {
-                val url = URL("https://autodark.***REMOVED***/crl/crl.pem")
+                val url = URL("https://${currentDomain}/crl/crl.pem")
                 val inputStream = url.openStream()
                 CertificateFactory.getInstance("X.509").generateCRL(inputStream) as X509CRL
             }
