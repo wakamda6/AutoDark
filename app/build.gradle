@@ -18,7 +18,12 @@ android {
 
     signingConfigs {
         release {
-            storeFile file(project.hasProperty('KEYSTORE_FILE') ? project.KEYSTORE_FILE : "")
+            if (project.hasProperty('KEYSTORE_FILE') && project.KEYSTORE_FILE) {
+                storeFile file(project.KEYSTORE_FILE)
+                storePassword project.KEYSTORE_PASSWORD
+                keyAlias project.KEY_ALIAS
+                keyPassword project.KEY_PASSWORD
+            }
             storePassword project.hasProperty('KEYSTORE_PASSWORD') ? project.KEYSTORE_PASSWORD : ""
             keyAlias project.hasProperty('KEY_ALIAS') ? project.KEY_ALIAS : ""
             keyPassword project.hasProperty('KEY_PASSWORD') ? project.KEY_PASSWORD : ""
@@ -38,8 +43,8 @@ android {
     productFlavors {
         auto {
 //            debug
-//            applicationId "com.autodark"
-            applicationId = id
+            applicationId "com.autodark"
+//            applicationId = id
         }
     }
     packagingOptions {

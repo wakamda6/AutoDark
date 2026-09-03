@@ -18,9 +18,15 @@ import com.autodark.R
 import com.autodark.databinding.FragmentSettingsBinding
 import com.autodark.service.FloatingWindowService
 import com.autodark.service.NotificationMonitorService
+import com.autodark.ui.MainActivity
 import com.autodark.ui.NoticeRecordActivity
 import com.autodark.ui.QuestionAndAnswerActivity
+import com.autodark.ui.showMqttAuthConfigDialog
+import com.autodark.ui.showSenderMailConfigDialog
 import com.autodark.utils.Constant
+import com.autodark.utils.MailConfig
+import com.autodark.utils.MqttAuthConfig
+import com.autodark.utils.TlsConfig
 import com.pengxh.kt.lite.base.KotlinBaseFragment
 import com.pengxh.kt.lite.extensions.convertColor
 import com.pengxh.kt.lite.extensions.navigatePageTo
@@ -77,6 +83,13 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
         }
     }
 
+    // 外部同步双向TLS开关状态（如退出双向认证时切回单向）
+    fun setMutualTlsSwitch(checked: Boolean) {
+        if (isAdded) {
+            binding.mutualTlsSwitch.isChecked = checked
+        }
+    }
+
     override fun initViewBinding(
         inflater: LayoutInflater, container: ViewGroup?
     ): FragmentSettingsBinding {
@@ -89,6 +102,11 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
     }
 
     override fun initEvent() {
+        binding.domainLayout.setOnClickListener {
+            LogUtils.log(Log.DEBUG,kTag,"服务器域名布局点击事件触发")
+            (requireActivity() as MainActivity).onEditDomain()
+        }
+
         binding.emailLayout.setOnClickListener {
             LogUtils.log(Log.DEBUG,kTag,"接收邮箱布局点击事件触发")
             AlertInputDialog.Builder()
@@ -114,6 +132,18 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
                         LogUtils.log(Log.DEBUG,kTag,"接收邮箱设置取消")
                     }
                 }).build().show()
+        }
+
+        binding.senderMailLayout.setOnClickListener {
+            LogUtils.log(Log.DEBUG,kTag,"发送邮箱布局点击事件触发")
+            showSenderMailConfigDialog(requireContext())
+        }
+
+        binding.mqttAccountLayout.setOnClickListener {
+            LogUtils.log(Log.DEBUG,kTag,"MQTT账号布局点击事件触发")
+            showMqttAuthConfigDialog(requireContext()) {
+                (requireActivity() as MainActivity).onMqttAuthChanged()
+            }
         }
 
         binding.timeoutLayout.setOnClickListener {
@@ -167,6 +197,15 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
                 requireActivity().window.setScreenBrightness(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_OFF)
                 // 显示黑色遮罩 + 禁用触摸
                 showScreenCover()
+            }
+        }
+
+        binding.mutualTlsSwitch.setOnCheckedChangeListener { _, isChecked ->
+            val current = TlsConfig.mutualTlsEnabled
+            if (current != isChecked) {
+                LogUtils.log(Log.DEBUG,kTag, "双向TLS开关状态改变: $isChecked")
+                TlsConfig.mutualTlsEnabled = isChecked
+                (requireActivity() as MainActivity).onTlsModeChanged()
             }
         }
 
@@ -340,13 +379,24 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
             }
         }
 
+        val app = requireActivity().application as BaseApplication
+        binding.domainTextView.text = app.domainAddress
+
         val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
         binding.emailTextView.text = emailAddress
         LogUtils.log(Log.DEBUG,kTag,"邮箱地址更新为: $emailAddress")
 
+        val senderAccount = MailConfig.senderAccount
+        binding.senderMailTextView.text = if (senderAccount.isBlank()) "未设置" else senderAccount
+
+        val mqttUsername = MqttAuthConfig.username
+        binding.mqttAccountTextView.text = if (mqttUsername.isBlank()) "默认(设备ID)" else mqttUsername
+
         val timeout = SaveKeyValues.getValue(Constant.TIMEOUT, "30s") as String
         binding.timeoutTextView.text = timeout
         LogUtils.log(Log.DEBUG,kTag,"超时设置更新为: $timeout")
+
+        binding.mutualTlsSwitch.isChecked = TlsConfig.mutualTlsEnabled
     }
 
 }

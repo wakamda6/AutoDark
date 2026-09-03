@@ -11,7 +11,9 @@ import android.net.Network
 import android.os.*
 import com.autodark.extensions.openApplication
 import com.autodark.utils.Constant
+import com.autodark.utils.MqttAuthConfig
 import com.autodark.utils.NetworkUtils
+import com.autodark.utils.TlsConfig
 import info.mqtt.android.service.Ack
 import info.mqtt.android.service.MqttAndroidClient
 import org.eclipse.paho.client.mqttv3.*
@@ -73,15 +75,16 @@ class MqttService : Service(), Handler.Callback {
 
         // MQTT 配置文件导入
         val currentDomain = (applicationContext as BaseApplication).domainAddress
-        mqttServerUrl = "ssl://${currentDomain}:8883"
+        mqttServerUrl = "ssl://${currentDomain}:${TlsConfig.mqttPort}"
         mqttClientId = (applicationContext as BaseApplication).mqttClientId
         mqttTopicCheckAppAlive = (applicationContext as BaseApplication).mqttTopicCheckAppAlive
         mqttTopicCheckAppAliveResult = (applicationContext as BaseApplication).mqttTopicCheckAppAliveResult
         mqttTopicDark = (applicationContext as BaseApplication).mqttTopicDark
         mqttTopicDarkResult = (applicationContext as BaseApplication).mqttTopicDarkResult
         mqttTopicLastWill = (applicationContext as BaseApplication).mqttTopicLastWill
-        user = id
-        pwd = id
+        // MQTT 账号密码：留空则回退使用设备 ID
+        user = MqttAuthConfig.username.ifBlank { id }
+        pwd = MqttAuthConfig.password.ifBlank { id }
         LogUtils.log(Log.DEBUG,kTag, "设备唯一ID：$id")
         LogUtils.log(Log.DEBUG,kTag, "加载 MQTT 配置文件")
 

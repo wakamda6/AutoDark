@@ -38,8 +38,17 @@ data class CertCheckResult(
 object CertificateManager  {
     private const val kTag = "CertificateManager"
 
-    //证书验证的主函数：
+    //证书验证的主函数：根据 TLS 模式走不同流程
     suspend fun getAndCheckCA(context: Context, ID: String, retryIfRevoked: Boolean = true): CertCheckResult {
+        return if (TlsConfig.mutualTlsEnabled) {
+            checkMutualCA(context, ID, retryIfRevoked)
+        } else {
+            checkOneWayCA()
+        }
+    }
+
+    // 双向 TLS：下载客户端证书 + CA，校验吊销，构建双向 SSL
+    private suspend fun checkMutualCA(context: Context, ID: String, retryIfRevoked: Boolean): CertCheckResult {
         val clientEnPath = File(context.filesDir, "$ID.en")
         val caEnPath = File(context.filesDir, "ca.en")
         val app = context.applicationContext as BaseApplication
@@ -76,7 +85,7 @@ object CertificateManager  {
             // 自动重试一次
             return if (retryIfRevoked) {
                 LogUtils.log(Log.DEBUG, kTag, "检测到吊销，尝试重新获取证书")
-                getAndCheckCA(context, ID, retryIfRevoked = false)
+                checkMutualCA(context, ID, retryIfRevoked = false)
             } else {
                 CertCheckResult(CertCheckResult.Status.CAisRevoked, "证书已被吊销")
             }
@@ -89,12 +98,19 @@ object CertificateManager  {
         }
 
         // 初始化 SSL
-        if(!MqttConfigHolder.initSslContextIfNeeded(p12Bytes, ID.toCharArray(), caBytes)){
+        if(!MqttConfigHolder.initMutualSslContext(p12Bytes, ID.toCharArray(), caBytes)){
             deleteCertFiles(clientEnPath, caEnPath)
             return CertCheckResult(CertCheckResult.Status.SSLError, "SSL 初始化失败")
         }
 
         return CertCheckResult(CertCheckResult.Status.CASuccess, checkCertResult.message)
+    }
+
+    // 单向 TLS：使用系统默认信任链，零证书下载
+    private fun checkOneWayCA(): CertCheckResult {
+        // 清空自定义 SSL 上下文，确保走系统信任链校验服务器证书
+        MqttConfigHolder.reset()
+        return CertCheckResult(CertCheckResult.Status.CASuccess, "单向TLS（系统信任）")
     }
 
     //删除ca文件

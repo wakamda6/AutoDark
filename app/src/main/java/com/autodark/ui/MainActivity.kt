@@ -36,7 +36,9 @@ import com.autodark.model.MqttStateHolder
 import com.autodark.service.MqttService
 import com.autodark.utils.Constant
 import com.autodark.utils.LogUtils
+import com.autodark.utils.MailConfig
 import com.autodark.utils.PermissionManager
+import com.autodark.utils.TlsConfig
 import com.pengxh.kt.lite.utils.SaveKeyValues
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -60,6 +62,8 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
     // 1. 在 Activity 或全局定义一个标记位
     private var hasSentLowBatteryWarning = false
+    // 发送邮箱首次配置弹窗是否已弹出过，避免重复弹窗
+    private var senderMailDialogShown = false
     //电量检测广播
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -198,6 +202,12 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     }else{
                         startService(Intent(this, MqttService::class.java))
                     }
+
+                    // 获取证书后，若发送邮箱未配置则强制填写（仅自动弹一次）
+                    if (!MailConfig.isConfigured && !senderMailDialogShown) {
+                        senderMailDialogShown = true
+                        showSenderMailConfigDialog(this, isFirstTime = true)
+                    }
                 }
                 is InitState.Failed -> {
                     showErrorDialog(state.reason, app.domainAddress)
@@ -317,8 +327,8 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                 // 打开输入框，并传入当前域名作为默认值
                 showDomainInputDialog(isFirstTime = false, defaultDomain = currentDomain)
             }
-            .setNegativeButton("退出") { _, _ ->
-                finish()
+            .setNegativeButton("退出双向认证") { _, _ ->
+                exitMutualTlsMode()
             }
             .show()
     }
@@ -335,12 +345,42 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         }, 1000)
     }
 
+    // TLS 模式切换后重新初始化：重置 SSL、停掉 MQTT、重新校验证书
+    fun onTlsModeChanged() {
+        LogUtils.log(Log.INFO, kTag, "TLS 模式切换，重新初始化")
+        MqttConfigHolder.reset()
+        stopService(Intent(this, MqttService::class.java))
+        viewModel.initCertificateCheck(darkID)
+    }
+
+    // 退出双向认证模式：关闭开关，切回单向 TLS
+    private fun exitMutualTlsMode() {
+        LogUtils.log(Log.INFO, kTag, "退出双向认证模式，切回单向 TLS")
+        TlsConfig.mutualTlsEnabled = false
+        settingsFragment.setMutualTlsSwitch(false)
+        onTlsModeChanged()
+    }
+
+    // MQTT 账号密码修改后重新连接
+    fun onMqttAuthChanged() {
+        LogUtils.log(Log.INFO, kTag, "MQTT 账号修改，重新连接")
+        restartMqttService()
+    }
+
+    // 设置页点击修改域名
+    fun onEditDomain() {
+        val app = applicationContext as BaseApplication
+        showDomainInputDialog(isFirstTime = false, defaultDomain = app.domainAddress)
+    }
+
 
     //正常返回桌面后再进入需要检测证书
     override fun onResume() {
         super.onResume()
-        //证书检查
-        viewModel.initCertificateCheck(darkID)
+        //证书检查（首次启动尚未输入域名时 darkID 为空，跳过）
+        if (darkID.isNotEmpty()) {
+            viewModel.initCertificateCheck(darkID)
+        }
     }
 
     override fun onDestroy() {
