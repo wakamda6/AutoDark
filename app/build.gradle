@@ -94,7 +94,10 @@ static def getBuildDate() {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation 'androidx.core:core-ktx:1.9.0'
-    implementation 'com.github.AndroidCoderPeng:Kotlin-lite-lib:1.0.11'
+    implementation('com.github.AndroidCoderPeng:Kotlin-lite-lib:1.0.11') {
+        // 排除未用到的 CameraX（其旧版 native 库未做 16KB 对齐，导致 Play 16KB 警告）
+        exclude group: 'androidx.camera'
+    }
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.6.1'
     implementation 'androidx.recyclerview:recyclerview:1.3.0'
