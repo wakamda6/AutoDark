@@ -103,3 +103,7 @@
 6. 删除 Bugly 崩溃上报
 7. 包名固定为 com.autodark，去除个人信息
 8. 开源：补全 README/CHANGELOG/LICENSE，历史重写清除密钥与敏感信息
+
+## 2026.9.4
+版本 3.0.1
+1. 修复 16KB 页面对齐警告：排除未用到的 CameraX 依赖

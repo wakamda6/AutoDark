@@ -18,8 +18,8 @@ android {
         applicationId "com.autodark"
         minSdkVersion 24
         targetSdkVersion 33
-        versionCode 300
-        versionName "3.0.0"
+        versionCode 301
+        versionName "3.0.1"
         flavorDimensions "versionCode"
     }
 
