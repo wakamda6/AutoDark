@@ -5,7 +5,6 @@ import android.app.Application
 import android.content.Context
 import android.provider.Settings
 import com.pengxh.kt.lite.utils.SaveKeyValues
-import com.tencent.bugly.crashreport.CrashReport
 import kotlin.properties.Delegates
 
 class BaseApplication : Application() {
@@ -48,7 +47,6 @@ class BaseApplication : Application() {
         super.onCreate()
         application = this
         SaveKeyValues.initSharedPreferences(this)
-        CrashReport.initCrashReport(this, "ce38195468", false)
         initDataBase()
 
         // 获取设备的 Android ID
