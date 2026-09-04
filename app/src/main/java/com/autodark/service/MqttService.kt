@@ -75,7 +75,7 @@ class MqttService : Service(), Handler.Callback {
 
         // MQTT 配置文件导入
         val currentDomain = (applicationContext as BaseApplication).domainAddress
-        mqttServerUrl = "ssl://${currentDomain}:${TlsConfig.mqttPort}"
+        mqttServerUrl = "${TlsConfig.scheme}://${currentDomain}:${TlsConfig.mqttPort}"
         mqttClientId = (applicationContext as BaseApplication).mqttClientId
         mqttTopicCheckAppAlive = (applicationContext as BaseApplication).mqttTopicCheckAppAlive
         mqttTopicCheckAppAliveResult = (applicationContext as BaseApplication).mqttTopicCheckAppAliveResult

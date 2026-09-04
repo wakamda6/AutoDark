@@ -130,15 +130,15 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         // 动态创建输入框（使用了推荐的单行替代写法）
         val inputEditText = EditText(this).apply {
             setText(defaultDomain)
-            hint = "请输入域名 (例如: example.com)"
+            hint = "请输入服务器地址（域名或IP）"
             maxLines = 1
             inputType = InputType.TYPE_CLASS_TEXT
             if (defaultDomain.isNotEmpty()) setSelection(defaultDomain.length)
         }
 
         val builder = AlertDialog.Builder(this)
-            .setTitle(if (isFirstTime) "首次启动配置" else "修改域名")
-            .setMessage("请输入服务器域名以继续使用：")
+            .setTitle(if (isFirstTime) "首次启动配置" else "修改服务器地址")
+            .setMessage("请输入服务器地址（域名或IP）以继续使用：")
             .setView(inputEditText)
             .setCancelable(false)
             .setPositiveButton("确定", null)
@@ -162,7 +162,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val inputDomain = inputEditText.text.toString().trim()
             if (inputDomain.isEmpty()) {
-                inputEditText.error = "域名不能为空！"
+                inputEditText.error = "地址不能为空！"
             } else {
                 // 保存域名到 BaseApplication (SharedPreferences)
                 app.domainAddress = inputDomain
@@ -323,8 +323,8 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             .setPositiveButton("重试") { _, _ ->
                 viewModel.initCertificateCheck(darkID)
             }
-            .setNeutralButton("修改域名") { _, _ ->
-                // 打开输入框，并传入当前域名作为默认值
+            .setNeutralButton("修改服务器地址") { _, _ ->
+                // 打开输入框，并传入当前地址作为默认值
                 showDomainInputDialog(isFirstTime = false, defaultDomain = currentDomain)
             }
             .setNegativeButton("退出双向认证") { _, _ ->
@@ -353,11 +353,11 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         viewModel.initCertificateCheck(darkID)
     }
 
-    // 退出双向认证模式：关闭开关，切回单向 TLS
+    // 退出双向认证：回退到进入双向之前的模式
     private fun exitMutualTlsMode() {
-        LogUtils.log(Log.INFO, kTag, "退出双向认证模式，切回单向 TLS")
-        TlsConfig.mutualTlsEnabled = false
-        settingsFragment.setMutualTlsSwitch(false)
+        LogUtils.log(Log.INFO, kTag, "退出双向认证，回退到之前模式")
+        TlsConfig.revertToPrevious()
+        settingsFragment.refreshConnectionMode()
         onTlsModeChanged()
     }
 

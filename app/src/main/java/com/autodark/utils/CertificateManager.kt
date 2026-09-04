@@ -40,10 +40,10 @@ object CertificateManager  {
 
     //证书验证的主函数：根据 TLS 模式走不同流程
     suspend fun getAndCheckCA(context: Context, ID: String, retryIfRevoked: Boolean = true): CertCheckResult {
-        return if (TlsConfig.mutualTlsEnabled) {
+        return if (TlsConfig.mode == TlsConfig.MODE_MUTUAL) {
             checkMutualCA(context, ID, retryIfRevoked)
         } else {
-            checkOneWayCA()
+            checkNoCert()
         }
     }
 
@@ -106,11 +106,11 @@ object CertificateManager  {
         return CertCheckResult(CertCheckResult.Status.CASuccess, checkCertResult.message)
     }
 
-    // 单向 TLS：使用系统默认信任链，零证书下载
-    private fun checkOneWayCA(): CertCheckResult {
-        // 清空自定义 SSL 上下文，确保走系统信任链校验服务器证书
+    // 无加密 / 单向 TLS：无需下载证书，清空自定义 SSL 上下文
+    private fun checkNoCert(): CertCheckResult {
         MqttConfigHolder.reset()
-        return CertCheckResult(CertCheckResult.Status.CASuccess, "单向TLS（系统信任）")
+        val desc = if (TlsConfig.mode == TlsConfig.MODE_ONE_WAY) "单向TLS（系统信任）" else "无加密"
+        return CertCheckResult(CertCheckResult.Status.CASuccess, desc)
     }
 
     //删除ca文件

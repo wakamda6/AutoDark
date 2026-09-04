@@ -76,7 +76,7 @@
                 android:layout_height="wrap_content"
                 android:layout_centerVertical="true"
                 android:gravity="center_vertical"
-                android:text="服务器域名"
+                android:text="服务器地址"
                 android:textColor="@color/colorText"
                 android:textSize="@dimen/sp_16" />
 
@@ -241,7 +241,7 @@
             android:background="#CCC" />
 
         <RelativeLayout
-            android:id="@+id/mutualTlsLayout"
+            android:id="@+id/modeLayout"
             android:layout_width="match_parent"
             android:layout_height="@dimen/itemLayoutHeight"
             android:background="@color/white"
@@ -251,22 +251,30 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_centerVertical="true"
-                android:text="双向TLS认证"
+                android:gravity="center_vertical"
+                android:text="连接方式"
                 android:textColor="@color/colorText"
                 android:textSize="@dimen/sp_16" />
 
-            <Switch
-                android:id="@+id/mutualTlsSwitch"
+            <TextView
+                android:id="@+id/modeTextView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
-                android:minWidth="48dp"
-                android:minHeight="48dp"
-                android:thumb="@drawable/select_switch_circle"
-                android:track="@drawable/select_switch_background"
-                tools:ignore="UseSwitchCompatOrMaterialXml" />
+                android:gravity="center_vertical"
+                android:textSize="@dimen/sp_16" />
         </RelativeLayout>
+
+        <TextView
+            android:id="@+id/modeDescTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/white"
+            android:paddingHorizontal="10dp"
+            android:paddingBottom="10dp"
+            android:textColor="#888888"
+            android:textSize="12sp" />
 
         <View
             android:layout_width="match_parent"

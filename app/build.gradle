@@ -4,6 +4,13 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply plugin: 'org.greenrobot.greendao'
 
+// 从本地 keystore.properties 读取签名信息（该文件 gitignored，不提交密钥）
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     compileSdkVersion 33
 
@@ -18,15 +25,12 @@ android {
 
     signingConfigs {
         release {
-            if (project.hasProperty('KEYSTORE_FILE') && project.KEYSTORE_FILE) {
-                storeFile file(project.KEYSTORE_FILE)
-                storePassword project.KEYSTORE_PASSWORD
-                keyAlias project.KEY_ALIAS
-                keyPassword project.KEY_PASSWORD
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['KEYSTORE_FILE'])
+                storePassword keystoreProperties['KEYSTORE_PASSWORD']
+                keyAlias keystoreProperties['KEY_ALIAS']
+                keyPassword keystoreProperties['KEY_PASSWORD']
             }
-            storePassword project.hasProperty('KEYSTORE_PASSWORD') ? project.KEYSTORE_PASSWORD : ""
-            keyAlias project.hasProperty('KEY_ALIAS') ? project.KEY_ALIAS : ""
-            keyPassword project.hasProperty('KEY_PASSWORD') ? project.KEY_PASSWORD : ""
         }
     }
     
@@ -39,12 +43,9 @@ android {
         }
     }
 
-    def id = "com.${createRandomCode()}.${createRandomCode()}"
     productFlavors {
         auto {
-//            debug
             applicationId "com.autodark"
-//            applicationId = id
         }
     }
     packagingOptions {
@@ -83,16 +84,6 @@ android {
             }
         }
     }
-}
-
-static def createRandomCode() {
-    def alphabetsInLowerCase = "abcdefghijklmnopqrstuvwxyz"
-    def randomString = ''
-    for (int i = 0; i < 10; i++) {
-        def randomIndex = (int) (Math.random() * alphabetsInLowerCase.length())
-        randomString += alphabetsInLowerCase.charAt(randomIndex)
-    }
-    return randomString
 }
 
 static def getBuildDate() {

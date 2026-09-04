@@ -83,10 +83,11 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
         }
     }
 
-    // 外部同步双向TLS开关状态（如退出双向认证时切回单向）
-    fun setMutualTlsSwitch(checked: Boolean) {
+    // 刷新连接方式显示（名称 + 风险/依赖说明）
+    fun refreshConnectionMode() {
         if (isAdded) {
-            binding.mutualTlsSwitch.isChecked = checked
+            binding.modeTextView.text = TlsConfig.modeName()
+            binding.modeDescTextView.text = TlsConfig.modeDescription()
         }
     }
 
@@ -200,13 +201,33 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
             }
         }
 
-        binding.mutualTlsSwitch.setOnCheckedChangeListener { _, isChecked ->
-            val current = TlsConfig.mutualTlsEnabled
-            if (current != isChecked) {
-                LogUtils.log(Log.DEBUG,kTag, "双向TLS开关状态改变: $isChecked")
-                TlsConfig.mutualTlsEnabled = isChecked
-                (requireActivity() as MainActivity).onTlsModeChanged()
-            }
+        binding.modeLayout.setOnClickListener {
+            LogUtils.log(Log.DEBUG,kTag, "连接方式布局点击事件触发")
+            val modeValues = arrayOf(TlsConfig.MODE_NONE, TlsConfig.MODE_ONE_WAY, TlsConfig.MODE_MUTUAL)
+            val modeLabels = arrayOf(
+                TlsConfig.modeName(TlsConfig.MODE_NONE),
+                TlsConfig.modeName(TlsConfig.MODE_ONE_WAY),
+                TlsConfig.modeName(TlsConfig.MODE_MUTUAL)
+            )
+            val currentIndex = modeValues.indexOf(TlsConfig.mode).coerceAtLeast(0)
+            AlertDialog.Builder(requireContext())
+                .setTitle("选择连接方式")
+                .setMessage(
+                    "无加密：只需云服务器+MQTT broker，账号密码明文传输（不安全）\n" +
+                    "单向TLS：另需域名+公网证书，校验服务器身份（较安全）\n" +
+                    "双向TLS：另需域名+自建CA+客户端证书，双向校验（最安全）"
+                )
+                .setSingleChoiceItems(modeLabels, currentIndex) { dialog, which ->
+                    val newMode = modeValues[which]
+                    dialog.dismiss()
+                    if (newMode != TlsConfig.mode) {
+                        TlsConfig.switchTo(newMode)
+                        refreshConnectionMode()
+                        (requireActivity() as MainActivity).onTlsModeChanged()
+                    }
+                }
+                .setNegativeButton("取消", null)
+                .show()
         }
 
         binding.notificationLayout.setOnClickListener {
@@ -396,7 +417,7 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
         binding.timeoutTextView.text = timeout
         LogUtils.log(Log.DEBUG,kTag,"超时设置更新为: $timeout")
 
-        binding.mutualTlsSwitch.isChecked = TlsConfig.mutualTlsEnabled
+        refreshConnectionMode()
     }
 
 }
