@@ -2,6 +2,8 @@
 
 通过 MQTT 远程控制 Android 手机屏幕（黑屏 / 最低亮度）的工具，常用于钉钉等打卡场景：手机常亮挂机、收到远程指令后调整屏幕，并监听打卡通知、通过邮件提醒结果。
 
+> **本项目基于 [DailyTask](https://github.com/AndroidCoderPeng/DailyTask) 的 1.5.6 分支修改而来，重点学习并验证 MQTT over TLS 与 mTLS（双向认证）流程。**
+
 ## 版本
 
 v2.3.1
@@ -68,4 +70,4 @@ KEY_PASSWORD=你的密码
 
 ## 致谢
 
-本工程基于 [AutoDingding](https://github.com/AndroidCoderPeng/DailyTask) 修改，原始版权归原作者所有。
+本项目基于 [DailyTask](https://github.com/AndroidCoderPeng/DailyTask) 的 **1.5.6 分支**修改而来，原始版权归原作者所有。项目重点参考并验证了其 **MQTT over TLS 与 mTLS（双向认证）** 流程实现。
