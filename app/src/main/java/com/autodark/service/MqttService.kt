@@ -87,6 +87,7 @@ class MqttService : Service(), Handler.Callback {
         pwd = MqttAuthConfig.password.ifBlank { id }
         LogUtils.log(Log.DEBUG,kTag, "设备唯一ID：$id")
         LogUtils.log(Log.DEBUG,kTag, "加载 MQTT 配置文件")
+        LogUtils.log(Log.INFO, kTag, "MQTT 认证：用户名=${user}，密码长度=${pwd.length}")
 
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         // Android 8.0（API 级别 26）及以上版本需要创建通知渠道

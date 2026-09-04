@@ -74,4 +74,13 @@ object TlsConfig {
         val prev = if (previousMode == MODE_MUTUAL) MODE_NONE else previousMode
         mode = prev
     }
+
+    // 判断字符串是否为 IP 地址（IPv4 或 IPv6）
+    fun isIpAddress(address: String): Boolean {
+        if (address.isBlank()) return false
+        val ipv4 = Regex("^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$")
+        if (ipv4.matches(address)) return true
+        // IPv6 简单判断：包含冒号
+        return address.contains(":")
+    }
 }

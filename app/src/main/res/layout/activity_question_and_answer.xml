@@ -33,7 +33,7 @@
         android:marqueeRepeatLimit="-1"
         android:padding="@dimen/dp_10"
         android:singleLine="true"
-        android:text="Tips：如有问题，请联系开发者"
+        android:text="Tips：如有问题，请查看服务器CA配置"
         android:textColor="@color/lib_hint_color"
         android:textSize="@dimen/sp_12" />
 </LinearLayout>

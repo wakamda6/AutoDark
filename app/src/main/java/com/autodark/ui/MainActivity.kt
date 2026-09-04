@@ -36,7 +36,6 @@ import com.autodark.model.MqttStateHolder
 import com.autodark.service.MqttService
 import com.autodark.utils.Constant
 import com.autodark.utils.LogUtils
-import com.autodark.utils.MailConfig
 import com.autodark.utils.PermissionManager
 import com.autodark.utils.TlsConfig
 import com.pengxh.kt.lite.utils.SaveKeyValues
@@ -62,8 +61,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
     // 1. 在 Activity 或全局定义一个标记位
     private var hasSentLowBatteryWarning = false
-    // 发送邮箱首次配置弹窗是否已弹出过，避免重复弹窗
-    private var senderMailDialogShown = false
     //电量检测广播
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -120,14 +117,12 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
     }
 
     /**
-     * 显示域名输入弹窗
-     * @param isFirstTime 是否是第一次启动强制输入
-     * @param defaultDomain 修改域名时的默认值
+     * 显示服务器地址输入弹窗
+     * @param defaultDomain 当前地址，作为默认值
      */
-    private fun showDomainInputDialog(isFirstTime: Boolean, defaultDomain: String = "") {
+    private fun showDomainInputDialog(defaultDomain: String = "") {
         val app = applicationContext as BaseApplication
 
-        // 动态创建输入框（使用了推荐的单行替代写法）
         val inputEditText = EditText(this).apply {
             setText(defaultDomain)
             hint = "请输入服务器地址（域名或IP）"
@@ -136,45 +131,35 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             if (defaultDomain.isNotEmpty()) setSelection(defaultDomain.length)
         }
 
-        val builder = AlertDialog.Builder(this)
-            .setTitle(if (isFirstTime) "首次启动配置" else "修改服务器地址")
-            .setMessage("请输入服务器地址（域名或IP）以继续使用：")
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("修改服务器地址")
+            .setMessage("请输入服务器地址（域名或IP）：")
             .setView(inputEditText)
             .setCancelable(false)
+            .setNegativeButton("取消", null)
             .setPositiveButton("确定", null)
+            .create()
 
-        if (!isFirstTime) {
-            // 【核心修改点】：如果用户点击取消，重新弹出错误对话框，维持原有的错误状态
-            builder.setNegativeButton("取消") { _, _ ->
-                // 从 ViewModel 里的最后状态获取错误原因，如果没有就传空
-                val reason = (viewModel.initState.value as? InitState.Failed)?.reason ?: "证书验证失败"
-                showErrorDialog(reason, app.domainAddress)
-            }
-        } else {
-            // 第一次启动如果不输入，提供一个退出应用的选项
-            builder.setNegativeButton("退出应用") { _, _ -> finish() }
-        }
-
-        val dialog = builder.create()
         dialog.show()
 
-        // 动态拦截 Positive 按钮，防止用户输入空格或留空
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+            dialog.dismiss()
+        }
+
+        // 动态拦截确定按钮，防止输入空格或留空
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-            val inputDomain = inputEditText.text.toString().trim()
-            if (inputDomain.isEmpty()) {
+            val inputAddress = inputEditText.text.toString().trim()
+            if (inputAddress.isEmpty()) {
                 inputEditText.error = "地址不能为空！"
             } else {
-                // 保存域名到 BaseApplication (SharedPreferences)
-                app.domainAddress = inputDomain
+                app.domainAddress = inputAddress
                 dialog.dismiss()
-
-                if (isFirstTime) {
-                    // 首次输入成功，继续后续的生命周期和初始化
-                    proceedWithInitialization()
-                } else {
-                    // 修改域名成功，重新触发证书验证
-                    viewModel.initCertificateCheck(darkID)
-                }
+                settingsFragment.refreshServerAddress()
+                // 根据地址类型设置默认连接方式：IP→无加密，域名→单向
+                TlsConfig.mode = if (TlsConfig.isIpAddress(inputAddress)) TlsConfig.MODE_NONE else TlsConfig.MODE_ONE_WAY
+                settingsFragment.refreshConnectionMode()
+                // 按新地址+模式重新初始化并重连 MQTT
+                onTlsModeChanged()
             }
         }
     }
@@ -203,11 +188,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                         startService(Intent(this, MqttService::class.java))
                     }
 
-                    // 获取证书后，若发送邮箱未配置则强制填写（仅自动弹一次）
-                    if (!MailConfig.isConfigured && !senderMailDialogShown) {
-                        senderMailDialogShown = true
-                        showSenderMailConfigDialog(this, isFirstTime = true)
-                    }
                 }
                 is InitState.Failed -> {
                     showErrorDialog(state.reason, app.domainAddress)
@@ -242,8 +222,10 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         registerReceiver(batteryReceiver, filter)
 
-        // 触发首次证书验证
-        viewModel.initCertificateCheck(darkID)
+        // 触发首次证书验证（仅当已配置服务器地址）
+        if (app.domainAddress.isNotEmpty()) {
+            viewModel.initCertificateCheck(darkID)
+        }
     }
 
     override fun initOnCreate(savedInstanceState: Bundle?) {
@@ -253,15 +235,8 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         // 测试日志输出
         LogUtils.log(Log.INFO, kTag, "应用启动成功")
 
-        // 2. 检查域名是否存在
-        val app = applicationContext as BaseApplication
-        if (app.domainAddress.isEmpty()) {
-            // 没有域名，强制要求用户输入
-            showDomainInputDialog(isFirstTime = true)
-        } else {
-            // 已经有域名，直接进入后续逻辑
-            proceedWithInitialization()
-        }
+        // 直接进入设置页，不再强制输入服务器地址，由用户在页面内自行配置
+        proceedWithInitialization()
     }
 
     // 发送mqtt连接失败邮件
@@ -325,7 +300,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             }
             .setNeutralButton("修改服务器地址") { _, _ ->
                 // 打开输入框，并传入当前地址作为默认值
-                showDomainInputDialog(isFirstTime = false, defaultDomain = currentDomain)
+                showDomainInputDialog(defaultDomain = currentDomain)
             }
             .setNegativeButton("退出双向认证") { _, _ ->
                 exitMutualTlsMode()
@@ -350,7 +325,10 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         LogUtils.log(Log.INFO, kTag, "TLS 模式切换，重新初始化")
         MqttConfigHolder.reset()
         stopService(Intent(this, MqttService::class.java))
-        viewModel.initCertificateCheck(darkID)
+        val app = applicationContext as BaseApplication
+        if (darkID.isNotEmpty() && app.domainAddress.isNotEmpty()) {
+            viewModel.initCertificateCheck(darkID)
+        }
     }
 
     // 退出双向认证：回退到进入双向之前的模式
@@ -367,18 +345,19 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         restartMqttService()
     }
 
-    // 设置页点击修改域名
+    // 设置页点击修改服务器地址
     fun onEditDomain() {
         val app = applicationContext as BaseApplication
-        showDomainInputDialog(isFirstTime = false, defaultDomain = app.domainAddress)
+        showDomainInputDialog(defaultDomain = app.domainAddress)
     }
 
 
     //正常返回桌面后再进入需要检测证书
     override fun onResume() {
         super.onResume()
-        //证书检查（首次启动尚未输入域名时 darkID 为空，跳过）
-        if (darkID.isNotEmpty()) {
+        //证书检查（服务器地址已配置时才进行）
+        val app = applicationContext as BaseApplication
+        if (darkID.isNotEmpty() && app.domainAddress.isNotEmpty()) {
             viewModel.initCertificateCheck(darkID)
         }
     }

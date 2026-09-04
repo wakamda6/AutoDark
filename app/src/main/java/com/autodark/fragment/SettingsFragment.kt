@@ -83,12 +83,32 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
         }
     }
 
-    // 刷新连接方式显示（名称 + 风险/依赖说明）
+    // 刷新连接方式显示（名称）
     fun refreshConnectionMode() {
         if (isAdded) {
             binding.modeTextView.text = TlsConfig.modeName()
-            binding.modeDescTextView.text = TlsConfig.modeDescription()
         }
+    }
+
+    // 刷新服务器地址显示
+    fun refreshServerAddress() {
+        if (isAdded) {
+            val app = requireActivity().application as BaseApplication
+            binding.domainTextView.text = app.domainAddress
+        }
+    }
+
+    // 切换到单向/双向 TLS 需要域名，当前是 IP 时提示先改域名
+    private fun showDomainRequiredForTlsDialog() {
+        AlertDialog.Builder(requireContext())
+            .setTitle("需要域名")
+            .setMessage("当前服务器地址是 IP，切换到单向/双向 TLS 需要域名。\n请先将服务器地址修改为域名。")
+            .setCancelable(false)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("修改服务器地址") { _, _ ->
+                (requireActivity() as MainActivity).onEditDomain()
+            }
+            .show()
     }
 
     override fun initViewBinding(
@@ -204,30 +224,33 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
         binding.modeLayout.setOnClickListener {
             LogUtils.log(Log.DEBUG,kTag, "连接方式布局点击事件触发")
             val modeValues = arrayOf(TlsConfig.MODE_NONE, TlsConfig.MODE_ONE_WAY, TlsConfig.MODE_MUTUAL)
-            val modeLabels = arrayOf(
+            val modeLabels = arrayListOf(
                 TlsConfig.modeName(TlsConfig.MODE_NONE),
                 TlsConfig.modeName(TlsConfig.MODE_ONE_WAY),
                 TlsConfig.modeName(TlsConfig.MODE_MUTUAL)
             )
-            val currentIndex = modeValues.indexOf(TlsConfig.mode).coerceAtLeast(0)
-            AlertDialog.Builder(requireContext())
-                .setTitle("选择连接方式")
-                .setMessage(
-                    "无加密：只需云服务器+MQTT broker，账号密码明文传输（不安全）\n" +
-                    "单向TLS：另需域名+公网证书，校验服务器身份（较安全）\n" +
-                    "双向TLS：另需域名+自建CA+客户端证书，双向校验（最安全）"
-                )
-                .setSingleChoiceItems(modeLabels, currentIndex) { dialog, which ->
-                    val newMode = modeValues[which]
-                    dialog.dismiss()
-                    if (newMode != TlsConfig.mode) {
+            BottomActionSheet.Builder()
+                .setContext(requireContext())
+                .setActionItemTitle(modeLabels)
+                .setItemTextColor(R.color.colorAppThemeLight.convertColor(requireContext()))
+                .setOnActionSheetListener(object : BottomActionSheet.OnActionSheetListener {
+                    override fun onActionItemClick(position: Int) {
+                        val newMode = modeValues[position]
+                        if (newMode == TlsConfig.mode) return
+                        // 从无加密切到单向/双向前，服务器地址必须是域名，不能是 IP
+                        if (newMode != TlsConfig.MODE_NONE) {
+                            val app = requireActivity().application as BaseApplication
+                            if (TlsConfig.isIpAddress(app.domainAddress)) {
+                                showDomainRequiredForTlsDialog()
+                                return
+                            }
+                        }
+                        LogUtils.log(Log.DEBUG, kTag, "连接方式切换为: $newMode")
                         TlsConfig.switchTo(newMode)
                         refreshConnectionMode()
                         (requireActivity() as MainActivity).onTlsModeChanged()
                     }
-                }
-                .setNegativeButton("取消", null)
-                .show()
+                }).build().show()
         }
 
         binding.notificationLayout.setOnClickListener {
