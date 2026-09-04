@@ -65,6 +65,38 @@
             android:gravity="start"/>
 
         <RelativeLayout
+            android:id="@+id/domainLayout"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/itemLayoutHeight"
+            android:background="@color/white"
+            android:paddingHorizontal="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:gravity="center_vertical"
+                android:text="服务器地址"
+                android:textColor="@color/colorText"
+                android:textSize="@dimen/sp_16" />
+
+            <TextView
+                android:id="@+id/domainTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:gravity="center_vertical"
+                android:textSize="@dimen/sp_16" />
+        </RelativeLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1px"
+            android:layout_marginHorizontal="@dimen/dp_10"
+            android:background="#CCC" />
+
+        <RelativeLayout
             android:id="@+id/emailLayout"
             android:layout_width="match_parent"
             android:layout_height="@dimen/itemLayoutHeight"
@@ -82,6 +114,38 @@
 
             <TextView
                 android:id="@+id/emailTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:gravity="center_vertical"
+                android:textSize="@dimen/sp_16" />
+        </RelativeLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1px"
+            android:layout_marginHorizontal="@dimen/dp_10"
+            android:background="#CCC" />
+
+        <RelativeLayout
+            android:id="@+id/senderMailLayout"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/itemLayoutHeight"
+            android:background="@color/white"
+            android:paddingHorizontal="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:gravity="center_vertical"
+                android:text="发送邮箱"
+                android:textColor="@color/colorText"
+                android:textSize="@dimen/sp_16" />
+
+            <TextView
+                android:id="@+id/senderMailTextView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignParentEnd="true"
@@ -137,6 +201,89 @@
             android:layout_height="1px"
             android:layout_marginHorizontal="@dimen/dp_10"
             android:background="#CCC" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1px"
+            android:layout_marginHorizontal="@dimen/dp_10"
+            android:background="#CCC" />
+
+        <RelativeLayout
+            android:id="@+id/mqttAccountLayout"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/itemLayoutHeight"
+            android:background="@color/white"
+            android:paddingHorizontal="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:gravity="center_vertical"
+                android:text="MQTT账号"
+                android:textColor="@color/colorText"
+                android:textSize="@dimen/sp_16" />
+
+            <TextView
+                android:id="@+id/mqttAccountTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:gravity="center_vertical"
+                android:textSize="@dimen/sp_16" />
+        </RelativeLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1px"
+            android:layout_marginHorizontal="@dimen/dp_10"
+            android:background="#CCC" />
+
+        <RelativeLayout
+            android:id="@+id/modeLayout"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/itemLayoutHeight"
+            android:background="@color/white"
+            android:paddingHorizontal="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:gravity="center_vertical"
+                android:text="连接方式"
+                android:textColor="@color/colorText"
+                android:textSize="@dimen/sp_16" />
+
+            <ImageView
+                android:id="@+id/modeArrow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:background="@drawable/ic_arrow_right" />
+
+            <TextView
+                android:id="@+id/modeTextView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_toStartOf="@id/modeArrow"
+                android:layout_centerVertical="true"
+                android:gravity="center_vertical"
+                android:textSize="@dimen/sp_16" />
+        </RelativeLayout>
+
+        <TextView
+            android:id="@+id/modeDescTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/white"
+            android:paddingHorizontal="10dp"
+            android:paddingBottom="10dp"
+            android:textColor="#888888"
+            android:textSize="12sp"
+            android:text="无加密：只需云服务器+broker，明文传输（不安全）\n单向TLS：另需域名+公网证书（较安全）\n双向TLS：另需域名+自建CA+客户端证书（最安全）" />
 
         <View
             android:layout_width="match_parent"

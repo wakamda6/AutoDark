@@ -11,7 +11,9 @@ import android.net.Network
 import android.os.*
 import com.autodark.extensions.openApplication
 import com.autodark.utils.Constant
+import com.autodark.utils.MqttAuthConfig
 import com.autodark.utils.NetworkUtils
+import com.autodark.utils.TlsConfig
 import info.mqtt.android.service.Ack
 import info.mqtt.android.service.MqttAndroidClient
 import org.eclipse.paho.client.mqttv3.*
@@ -72,17 +74,20 @@ class MqttService : Service(), Handler.Callback {
         id = (applicationContext as BaseApplication).androidId
 
         // MQTT 配置文件导入
-        mqttServerUrl = (applicationContext as BaseApplication).mqttServerUrl
+        val currentDomain = (applicationContext as BaseApplication).domainAddress
+        mqttServerUrl = "${TlsConfig.scheme}://${currentDomain}:${TlsConfig.mqttPort}"
         mqttClientId = (applicationContext as BaseApplication).mqttClientId
         mqttTopicCheckAppAlive = (applicationContext as BaseApplication).mqttTopicCheckAppAlive
         mqttTopicCheckAppAliveResult = (applicationContext as BaseApplication).mqttTopicCheckAppAliveResult
         mqttTopicDark = (applicationContext as BaseApplication).mqttTopicDark
         mqttTopicDarkResult = (applicationContext as BaseApplication).mqttTopicDarkResult
         mqttTopicLastWill = (applicationContext as BaseApplication).mqttTopicLastWill
-        user = id
-        pwd = id
+        // MQTT 账号密码：留空则回退使用设备 ID
+        user = MqttAuthConfig.username.ifBlank { id }
+        pwd = MqttAuthConfig.password.ifBlank { id }
         LogUtils.log(Log.DEBUG,kTag, "设备唯一ID：$id")
         LogUtils.log(Log.DEBUG,kTag, "加载 MQTT 配置文件")
+        LogUtils.log(Log.INFO, kTag, "MQTT 认证：用户名=${user}，密码长度=${pwd.length}")
 
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         // Android 8.0（API 级别 26）及以上版本需要创建通知渠道

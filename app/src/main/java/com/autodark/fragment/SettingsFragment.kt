@@ -18,9 +18,15 @@ import com.autodark.R
 import com.autodark.databinding.FragmentSettingsBinding
 import com.autodark.service.FloatingWindowService
 import com.autodark.service.NotificationMonitorService
+import com.autodark.ui.MainActivity
 import com.autodark.ui.NoticeRecordActivity
 import com.autodark.ui.QuestionAndAnswerActivity
+import com.autodark.ui.showMqttAuthConfigDialog
+import com.autodark.ui.showSenderMailConfigDialog
 import com.autodark.utils.Constant
+import com.autodark.utils.MailConfig
+import com.autodark.utils.MqttAuthConfig
+import com.autodark.utils.TlsConfig
 import com.pengxh.kt.lite.base.KotlinBaseFragment
 import com.pengxh.kt.lite.extensions.convertColor
 import com.pengxh.kt.lite.extensions.navigatePageTo
@@ -77,6 +83,34 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
         }
     }
 
+    // 刷新连接方式显示（名称）
+    fun refreshConnectionMode() {
+        if (isAdded) {
+            binding.modeTextView.text = TlsConfig.modeName()
+        }
+    }
+
+    // 刷新服务器地址显示
+    fun refreshServerAddress() {
+        if (isAdded) {
+            val app = requireActivity().application as BaseApplication
+            binding.domainTextView.text = app.domainAddress
+        }
+    }
+
+    // 切换到单向/双向 TLS 需要域名，当前是 IP 时提示先改域名
+    private fun showDomainRequiredForTlsDialog() {
+        AlertDialog.Builder(requireContext())
+            .setTitle("需要域名")
+            .setMessage("当前服务器地址是 IP，切换到单向/双向 TLS 需要域名。\n请先将服务器地址修改为域名。")
+            .setCancelable(false)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("修改服务器地址") { _, _ ->
+                (requireActivity() as MainActivity).onEditDomain()
+            }
+            .show()
+    }
+
     override fun initViewBinding(
         inflater: LayoutInflater, container: ViewGroup?
     ): FragmentSettingsBinding {
@@ -89,6 +123,11 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
     }
 
     override fun initEvent() {
+        binding.domainLayout.setOnClickListener {
+            LogUtils.log(Log.DEBUG,kTag,"服务器域名布局点击事件触发")
+            (requireActivity() as MainActivity).onEditDomain()
+        }
+
         binding.emailLayout.setOnClickListener {
             LogUtils.log(Log.DEBUG,kTag,"接收邮箱布局点击事件触发")
             AlertInputDialog.Builder()
@@ -114,6 +153,18 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
                         LogUtils.log(Log.DEBUG,kTag,"接收邮箱设置取消")
                     }
                 }).build().show()
+        }
+
+        binding.senderMailLayout.setOnClickListener {
+            LogUtils.log(Log.DEBUG,kTag,"发送邮箱布局点击事件触发")
+            showSenderMailConfigDialog(requireContext())
+        }
+
+        binding.mqttAccountLayout.setOnClickListener {
+            LogUtils.log(Log.DEBUG,kTag,"MQTT账号布局点击事件触发")
+            showMqttAuthConfigDialog(requireContext()) {
+                (requireActivity() as MainActivity).onMqttAuthChanged()
+            }
         }
 
         binding.timeoutLayout.setOnClickListener {
@@ -168,6 +219,38 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
                 // 显示黑色遮罩 + 禁用触摸
                 showScreenCover()
             }
+        }
+
+        binding.modeLayout.setOnClickListener {
+            LogUtils.log(Log.DEBUG,kTag, "连接方式布局点击事件触发")
+            val modeValues = arrayOf(TlsConfig.MODE_NONE, TlsConfig.MODE_ONE_WAY, TlsConfig.MODE_MUTUAL)
+            val modeLabels = arrayListOf(
+                TlsConfig.modeName(TlsConfig.MODE_NONE),
+                TlsConfig.modeName(TlsConfig.MODE_ONE_WAY),
+                TlsConfig.modeName(TlsConfig.MODE_MUTUAL)
+            )
+            BottomActionSheet.Builder()
+                .setContext(requireContext())
+                .setActionItemTitle(modeLabels)
+                .setItemTextColor(R.color.colorAppThemeLight.convertColor(requireContext()))
+                .setOnActionSheetListener(object : BottomActionSheet.OnActionSheetListener {
+                    override fun onActionItemClick(position: Int) {
+                        val newMode = modeValues[position]
+                        if (newMode == TlsConfig.mode) return
+                        // 从无加密切到单向/双向前，服务器地址必须是域名，不能是 IP
+                        if (newMode != TlsConfig.MODE_NONE) {
+                            val app = requireActivity().application as BaseApplication
+                            if (TlsConfig.isIpAddress(app.domainAddress)) {
+                                showDomainRequiredForTlsDialog()
+                                return
+                            }
+                        }
+                        LogUtils.log(Log.DEBUG, kTag, "连接方式切换为: $newMode")
+                        TlsConfig.switchTo(newMode)
+                        refreshConnectionMode()
+                        (requireActivity() as MainActivity).onTlsModeChanged()
+                    }
+                }).build().show()
         }
 
         binding.notificationLayout.setOnClickListener {
@@ -340,13 +423,24 @@ class SettingsFragment : KotlinBaseFragment<FragmentSettingsBinding>() {
             }
         }
 
+        val app = requireActivity().application as BaseApplication
+        binding.domainTextView.text = app.domainAddress
+
         val emailAddress = SaveKeyValues.getValue(Constant.EMAIL_ADDRESS, "") as String
         binding.emailTextView.text = emailAddress
         LogUtils.log(Log.DEBUG,kTag,"邮箱地址更新为: $emailAddress")
 
+        val senderAccount = MailConfig.senderAccount
+        binding.senderMailTextView.text = if (senderAccount.isBlank()) "未设置" else senderAccount
+
+        val mqttUsername = MqttAuthConfig.username
+        binding.mqttAccountTextView.text = if (mqttUsername.isBlank()) "默认(设备ID)" else mqttUsername
+
         val timeout = SaveKeyValues.getValue(Constant.TIMEOUT, "30s") as String
         binding.timeoutTextView.text = timeout
         LogUtils.log(Log.DEBUG,kTag,"超时设置更新为: $timeout")
+
+        refreshConnectionMode()
     }
 
 }

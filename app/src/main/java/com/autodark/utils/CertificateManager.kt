@@ -2,6 +2,7 @@ package com.autodark.utils
 
 import android.content.Context
 import android.util.Log
+import com.autodark.BaseApplication
 import com.autodark.model.InitViewModel
 import com.autodark.ui.MqttConfigHolder
 import kotlinx.coroutines.Dispatchers
@@ -37,11 +38,22 @@ data class CertCheckResult(
 object CertificateManager  {
     private const val kTag = "CertificateManager"
 
-    //证书验证的主函数：
+    //证书验证的主函数：根据 TLS 模式走不同流程
     suspend fun getAndCheckCA(context: Context, ID: String, retryIfRevoked: Boolean = true): CertCheckResult {
+        return if (TlsConfig.mode == TlsConfig.MODE_MUTUAL) {
+            checkMutualCA(context, ID, retryIfRevoked)
+        } else {
+            checkNoCert()
+        }
+    }
+
+    // 双向 TLS：下载客户端证书 + CA，校验吊销，构建双向 SSL
+    private suspend fun checkMutualCA(context: Context, ID: String, retryIfRevoked: Boolean): CertCheckResult {
         val clientEnPath = File(context.filesDir, "$ID.en")
         val caEnPath = File(context.filesDir, "ca.en")
-        val baseUrl = "https://autodark.wakamda.fun/certs/${ID}/en_${ID}"
+        val app = context.applicationContext as BaseApplication
+        val currentDomain = app.domainAddress // 用这个变量去拼接你的请求 URL
+        val baseUrl = "https://${currentDomain}/certs/${ID}/en_${ID}"
         val clientEnUrl = "$baseUrl/${ID}.en"
         val caEnUrl = "$baseUrl/ca.en"
 
@@ -61,7 +73,7 @@ object CertificateManager  {
         }
 
         //3加载并验证证书
-        val checkCertResult = checkCertRevoked(p12Bytes, ID)
+        val checkCertResult = checkCertRevoked(currentDomain,p12Bytes, ID)
 
         //如果是证书被吊销，自动重试一次
         if (checkCertResult.status == CertCheckResult.Status.CAisRevoked) {
@@ -73,7 +85,7 @@ object CertificateManager  {
             // 自动重试一次
             return if (retryIfRevoked) {
                 LogUtils.log(Log.DEBUG, kTag, "检测到吊销，尝试重新获取证书")
-                getAndCheckCA(context, ID, retryIfRevoked = false)
+                checkMutualCA(context, ID, retryIfRevoked = false)
             } else {
                 CertCheckResult(CertCheckResult.Status.CAisRevoked, "证书已被吊销")
             }
@@ -86,12 +98,19 @@ object CertificateManager  {
         }
 
         // 初始化 SSL
-        if(!MqttConfigHolder.initSslContextIfNeeded(p12Bytes, ID.toCharArray(), caBytes)){
+        if(!MqttConfigHolder.initMutualSslContext(p12Bytes, ID.toCharArray(), caBytes)){
             deleteCertFiles(clientEnPath, caEnPath)
             return CertCheckResult(CertCheckResult.Status.SSLError, "SSL 初始化失败")
         }
 
         return CertCheckResult(CertCheckResult.Status.CASuccess, checkCertResult.message)
+    }
+
+    // 无加密 / 单向 TLS：无需下载证书，清空自定义 SSL 上下文
+    private fun checkNoCert(): CertCheckResult {
+        MqttConfigHolder.reset()
+        val desc = if (TlsConfig.mode == TlsConfig.MODE_ONE_WAY) "单向TLS（系统信任）" else "无加密"
+        return CertCheckResult(CertCheckResult.Status.CASuccess, desc)
     }
 
     //删除ca文件
@@ -155,7 +174,7 @@ object CertificateManager  {
     }
 
     //3. 加载并验证证书：获取剩余时长并返回，失败则返回验证失败，等待后续添加吊销后重新下载一次的逻辑
-    private suspend fun checkCertRevoked(bytes: ByteArray, ID: String): CertCheckResult  {
+    private suspend fun checkCertRevoked(currentDomain: String, bytes: ByteArray, ID: String): CertCheckResult  {
 
         val p12P = ID.toCharArray()
         val keyStore = KeyStore.getInstance("PKCS12")
@@ -168,7 +187,7 @@ object CertificateManager  {
             val clientCert = keyStore.getCertificate(alias) as X509Certificate
 
             val crl = withContext(Dispatchers.IO) {
-                val url = URL("https://autodark.wakamda.fun/crl/crl.pem")
+                val url = URL("https://${currentDomain}/crl/crl.pem")
                 val inputStream = url.openStream()
                 CertificateFactory.getInstance("X.509").generateCRL(inputStream) as X509CRL
             }

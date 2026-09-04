@@ -9,6 +9,7 @@ import android.os.BatteryManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.InputType
 import android.view.KeyEvent
 import androidx.fragment.app.Fragment
 import com.autodark.R
@@ -18,6 +19,7 @@ import com.pengxh.kt.lite.base.KotlinBaseActivity
 import com.pengxh.kt.lite.extensions.show
 import android.util.Log
 import android.view.WindowManager
+import android.widget.EditText
 import androidx.activity.viewModels
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -35,6 +37,7 @@ import com.autodark.service.MqttService
 import com.autodark.utils.Constant
 import com.autodark.utils.LogUtils
 import com.autodark.utils.PermissionManager
+import com.autodark.utils.TlsConfig
 import com.pengxh.kt.lite.utils.SaveKeyValues
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -88,9 +91,6 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                             LogUtils.log(Log.ERROR, kTag, "发送电量邮件失败: ${e.message}")
                         }
                     }
-                } else if (batteryPct > 30) {
-                    // 4. 当电量回升到 30% 以上时（正在充电），重置标记位，准备下次 25% 再次预警
-                    hasSentLowBatteryWarning = false
                 }
             }
         }
@@ -116,18 +116,60 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
 
     }
 
+    /**
+     * 显示服务器地址输入弹窗
+     * @param defaultDomain 当前地址，作为默认值
+     */
+    private fun showDomainInputDialog(defaultDomain: String = "") {
+        val app = applicationContext as BaseApplication
 
-    override fun initOnCreate(savedInstanceState: Bundle?) {
+        val inputEditText = EditText(this).apply {
+            setText(defaultDomain)
+            hint = "请输入服务器地址（域名或IP）"
+            maxLines = 1
+            inputType = InputType.TYPE_CLASS_TEXT
+            if (defaultDomain.isNotEmpty()) setSelection(defaultDomain.length)
+        }
 
-        // 初始化 LogUtils
-        LogUtils.initialize(this)
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("修改服务器地址")
+            .setMessage("请输入服务器地址（域名或IP）：")
+            .setView(inputEditText)
+            .setCancelable(false)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("确定", null)
+            .create()
 
-        // 测试日志输出
-        LogUtils.log(Log.INFO, kTag, "应用启动成功")
+        dialog.show()
 
-        //id获取
-        darkID = (applicationContext as BaseApplication).androidId
-        caTimes = (applicationContext as BaseApplication).caTimes
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+            dialog.dismiss()
+        }
+
+        // 动态拦截确定按钮，防止输入空格或留空
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val inputAddress = inputEditText.text.toString().trim()
+            if (inputAddress.isEmpty()) {
+                inputEditText.error = "地址不能为空！"
+            } else {
+                app.domainAddress = inputAddress
+                dialog.dismiss()
+                settingsFragment.refreshServerAddress()
+                // 根据地址类型设置默认连接方式：IP→无加密，域名→单向
+                TlsConfig.mode = if (TlsConfig.isIpAddress(inputAddress)) TlsConfig.MODE_NONE else TlsConfig.MODE_ONE_WAY
+                settingsFragment.refreshConnectionMode()
+                // 按新地址+模式重新初始化并重连 MQTT
+                onTlsModeChanged()
+            }
+        }
+    }
+
+    private fun proceedWithInitialization() {
+        val app = applicationContext as BaseApplication
+
+        // id获取
+        darkID = app.androidId
+        caTimes = app.caTimes
 
         val fragmentAdapter = BaseFragmentAdapter(supportFragmentManager, fragmentPages)
         binding.viewPager.adapter = fragmentAdapter
@@ -145,9 +187,10 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
                     }else{
                         startService(Intent(this, MqttService::class.java))
                     }
+
                 }
                 is InitState.Failed -> {
-                    showErrorDialog(state.reason)
+                    showErrorDialog(state.reason, app.domainAddress)
                 }
             }
         }
@@ -179,6 +222,21 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
         registerReceiver(batteryReceiver, filter)
 
+        // 触发首次证书验证（仅当已配置服务器地址）
+        if (app.domainAddress.isNotEmpty()) {
+            viewModel.initCertificateCheck(darkID)
+        }
+    }
+
+    override fun initOnCreate(savedInstanceState: Bundle?) {
+
+        // 初始化 LogUtils
+        LogUtils.initialize(this)
+        // 测试日志输出
+        LogUtils.log(Log.INFO, kTag, "应用启动成功")
+
+        // 直接进入设置页，不再强制输入服务器地址，由用户在页面内自行配置
+        proceedWithInitialization()
     }
 
     // 发送mqtt连接失败邮件
@@ -232,7 +290,7 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         } else super.onKeyDown(keyCode, event)
     }
 
-    private fun showErrorDialog(reason: String) {
+    private fun showErrorDialog(reason: String, currentDomain: String) {
         AlertDialog.Builder(this)
             .setTitle("初始化失败")
             .setMessage(reason)
@@ -240,8 +298,12 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
             .setPositiveButton("重试") { _, _ ->
                 viewModel.initCertificateCheck(darkID)
             }
-            .setNegativeButton("退出") { _, _ ->
-                finish()
+            .setNeutralButton("修改服务器地址") { _, _ ->
+                // 打开输入框，并传入当前地址作为默认值
+                showDomainInputDialog(defaultDomain = currentDomain)
+            }
+            .setNegativeButton("退出双向认证") { _, _ ->
+                exitMutualTlsMode()
             }
             .show()
     }
@@ -258,12 +320,46 @@ class MainActivity : KotlinBaseActivity<ActivityMainBinding>() {
         }, 1000)
     }
 
+    // TLS 模式切换后重新初始化：重置 SSL、停掉 MQTT、重新校验证书
+    fun onTlsModeChanged() {
+        LogUtils.log(Log.INFO, kTag, "TLS 模式切换，重新初始化")
+        MqttConfigHolder.reset()
+        stopService(Intent(this, MqttService::class.java))
+        val app = applicationContext as BaseApplication
+        if (darkID.isNotEmpty() && app.domainAddress.isNotEmpty()) {
+            viewModel.initCertificateCheck(darkID)
+        }
+    }
+
+    // 退出双向认证：回退到进入双向之前的模式
+    private fun exitMutualTlsMode() {
+        LogUtils.log(Log.INFO, kTag, "退出双向认证，回退到之前模式")
+        TlsConfig.revertToPrevious()
+        settingsFragment.refreshConnectionMode()
+        onTlsModeChanged()
+    }
+
+    // MQTT 账号密码修改后重新连接
+    fun onMqttAuthChanged() {
+        LogUtils.log(Log.INFO, kTag, "MQTT 账号修改，重新连接")
+        restartMqttService()
+    }
+
+    // 设置页点击修改服务器地址
+    fun onEditDomain() {
+        val app = applicationContext as BaseApplication
+        showDomainInputDialog(defaultDomain = app.domainAddress)
+    }
+
 
     //正常返回桌面后再进入需要检测证书
     override fun onResume() {
         super.onResume()
-        //证书检查
-        viewModel.initCertificateCheck(darkID)
+        //证书检查（服务器地址已配置时才进行）
+        val app = applicationContext as BaseApplication
+        if (darkID.isNotEmpty() && app.domainAddress.isNotEmpty()) {
+            viewModel.initCertificateCheck(darkID)
+        }
     }
 
     override fun onDestroy() {

@@ -2,7 +2,7 @@ package com.autodark.extensions
 
 import android.content.Context
 import android.widget.Toast
-import com.autodark.utils.Constant
+import com.autodark.utils.MailConfig
 import com.pengxh.kt.lite.extensions.timestampToCompleteDate
 import com.pengxh.kt.lite.extensions.timestampToDate
 import java.io.File
@@ -62,10 +62,10 @@ fun String.createTextMail(subject: String, toAddress: String): com.autodark.bean
     mailInfo.mailServerHost = "smtp.qq.com" //发送方邮箱服务器
     mailInfo.mailServerPort = "587" //发送方邮箱端口号
     mailInfo.isValidate = true
-    mailInfo.userName = Constant.USER_MAIL_ACCOUNT
-    mailInfo.password = Constant.PERMISSION_CODE
+    mailInfo.userName = MailConfig.senderAccount
+    mailInfo.password = MailConfig.senderAuthCode
     mailInfo.toAddress = toAddress // 接收者邮箱
-    mailInfo.fromAddress = Constant.MAIL_FROM_ADDRESS
+    mailInfo.fromAddress = MailConfig.senderAccount
     mailInfo.subject = subject // 邮件主题
     val content = if (this == "") {
         "未监听到打卡成功的通知，请手动登录检查" + System.currentTimeMillis().timestampToCompleteDate()
@@ -82,10 +82,10 @@ fun String.createAttachFileMail(subject: String, toAddress: String, imagePath: S
     mailInfo.mailServerHost = "smtp.qq.com" //发送方邮箱服务器
     mailInfo.mailServerPort = "587" //发送方邮箱端口号
     mailInfo.isValidate = true
-    mailInfo.userName = Constant.USER_MAIL_ACCOUNT
-    mailInfo.password = Constant.PERMISSION_CODE
+    mailInfo.userName = MailConfig.senderAccount
+    mailInfo.password = MailConfig.senderAuthCode
     mailInfo.toAddress = toAddress // 接收者邮箱
-    mailInfo.fromAddress = Constant.MAIL_FROM_ADDRESS
+    mailInfo.fromAddress = MailConfig.senderAccount
     mailInfo.subject = subject // 邮件主题
     // 邮件文本
     mailInfo.content = this
